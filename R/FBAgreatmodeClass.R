@@ -47,8 +47,8 @@ validityGreatModClass=function(object)
     return("The obj_fun, ub, and lb have different lengths. The number of rections should be equal to the number of columns of S.")
   }
 
-  if(length(object@react_id)!=ncol)
-    return("The vector of reactions id is different from the number of columns of S!")
+  if(length(unique(object@react_id))!=ncol)
+    return("The vector of reactions name is different from the number of columns of S, or multiple reactions have the same name (it is not allowed)!")
 
   return(TRUE)
 }
@@ -108,6 +108,40 @@ setMethod(f="setObjFun",
             obj_coef = rep(0,length(theObject@obj_coef))
             obj_coef[id] = 1
             theObject@obj_coef = obj_coef
+
+            return(theObject)
+          }
+)
+
+#' @aliases setConstraints FBA_greatmod-methods
+#' @param theObject A `FBA_greatmod` object
+#' @param reaction.name Character of the reaction name.
+#' @param newConstraints Numeric vector of length equal to 2 containing the new lower and upper constraints
+#' @docType methods
+#' @rdname FBA_greatmod-methods
+#' @return The FBA_greatmod class with the the constraints updated.
+#' @export
+
+setGeneric(name="setConstraints",
+           def=function(theObject,reaction.name,newConstraints)
+           {
+             standardGeneric("setConstraints")
+           }
+)
+
+setMethod(f="setConstraints",
+          signature=c("FBA_greatmod","character","numeric"),
+          definition=function(theObject,reaction.name,newConstraints)
+          {
+            index.r = which(theObject@react_id == reaction.name)
+            if(length(index.r)==0)
+              stop("The reaction does not match any reaction name in the model.")
+
+            if(length(unique(newConstraints)) !=2 )
+              stop("The parameter newConstraints must be a vector of two different numeric value (the minimum one will be the new lwbnd, the maximum the uppbnd)  ")
+
+            theObject@uppbnd[index.r] = max(newConstraints)
+            theObject@lowbnd[index.r] = min(newConstraints)
 
             return(theObject)
           }
