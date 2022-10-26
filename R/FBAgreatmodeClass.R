@@ -184,7 +184,7 @@ setMethod(f="setDiet",
 
               NotComm = diet$reactionID[! diet$reactionID %in% theObject@react_id]
               if(length(NotComm) > 0 )
-                print(paste0( length(NotComm), " reactions are not present in the FBA model") )
+                print(paste0( length(NotComm), " reactions of ",length(diet$reactionID)," are not present in the FBA model") )
             }
 
             return(theObject)

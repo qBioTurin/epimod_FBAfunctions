@@ -1,5 +1,5 @@
 
-**epimod_FBAfunctions**  is an R package for supporting the general modeling framework [GreatMod]() for the integration of metabolic models, represented as a Flux Balance Analysis (FBA) problem, into a dynamic model, represented as a set of ordinary differential equations (ODEs).
+**epimod_FBAfunctions**  is an R package for supporting the general modeling framework [GreatMod](https://qbioturin.github.io/epimod/) for the integration of metabolic models, represented as a Flux Balance Analysis (FBA) problem, into a dynamic model, represented as a set of ordinary differential equations (ODEs).
 
 # GreatMod and FBA
 
