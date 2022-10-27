@@ -135,8 +135,8 @@ setMethod(f="getConstraints",
             if(length(index.r)==0)
               stop("The reaction does not match any reaction name in the model.")
 
-            Constraints = c(theObject@uppbnd[index.r],
-                            theObject@lowbnd[index.r])
+            Constraints = c(theObject@lowbnd[index.r],
+                            theObject@uppbnd[index.r])
 
             return(Constraints)
           }
