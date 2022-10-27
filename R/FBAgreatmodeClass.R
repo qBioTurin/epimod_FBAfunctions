@@ -15,7 +15,8 @@ setClass(
     react_id = "character",
     dietName = "character",
     dietValues = "data.frame",
-    lowbnd_beforeDiet = "numeric"
+    lowbnd_beforeDiet = "numeric",
+    uppbnd_beforeDiet = "numeric"
   )
 )
 
@@ -204,29 +205,24 @@ setMethod(f="setDiet",
                 diet = readr::read_delim(dietf,
                                          delim = "\t", escape_double = FALSE,
                                          trim_ws = TRUE)
-                if(length(diet[1,]) != 2)
-                  return("The file should have two columns: 1) reactions name and 2) flux values.")
+                if(length(diet[1,]) != 3)
+                  return("The file should have three columns: 1) reactions name, 2) lwbnd and 3) uppbwnd.")
               }
               else
               {
                 return("The file does not exist.")
               }
             }
-            else if(length(dietf[1,]) == 2)
+            else if(length(dietf[1,]) == 3)
             {
               diet <- dietf
             }
             else
             {
-              return("dietf should be a data.frame with two columns: 1) reactions name and 2) flux values.")
+              return("dietf should be a data.frame with three columns: 1) reactions name, 2) lwbnd and 3) uppbwnd.")
             }
 
-            colnames(diet) = c("reactionID","fluxValue")
-
-            if(length(which(diet$fluxValue > 0)))
-            {
-              diet$fluxValue[which(diet$fluxValue > 0)] = -diet$fluxValue[which(diet$fluxValue > 0)]
-            }
+            colnames(diet) = c("reactionID","bnd1","bnd2")
 
             theObject@dietValues = diet
             reactionComm = diet$reactionID[diet$reactionID %in% model@react_id]
@@ -237,12 +233,15 @@ setMethod(f="setDiet",
             }
             else
             {
-              lowbnd_index = match(reactionComm, theObject@react_id )
+              bnd_index = match(reactionComm, theObject@react_id )
               theObject@lowbnd_beforeDiet = theObject@lowbnd
+              theObject@uppbnd_beforeDiet = theObject@uppbnd
 
               for(b in 1:length(reactionComm))
               {
-                theObject@lowbnd[lowbnd_index[b]] = diet$fluxValue[diet$reactionID == reactionComm[b]]
+                bnds = diet[diet$reactionID == reactionComm[b],-1]
+                theObject@lowbnd[bnd_index[b]] = min(bnds)
+                theObject@uppbnd[bnd_index[b]] = max(bnds)
               }
 
               NotComm = diet$reactionID[! diet$reactionID %in% theObject@react_id]
