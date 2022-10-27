@@ -1,4 +1,4 @@
-
+library(dplyr)
 
 model = FBA4Greatmod.generation(fba_mat = "inst/data/Ec_core.mat")
 #model = FBA4Greatmod.generation(fba_mat = "inst/data/MATmodels/Ec_K12.mat")
@@ -9,7 +9,10 @@ diet = readr::read_delim("inst/data/diets/vmh/EU_average.tsv",
                   trim_ws = TRUE)
 diet$Reaction = gsub("\\[", replacement = "\\(", diet$Reaction)
 diet$Reaction = gsub("\\]", replacement = "\\)", diet$Reaction)
-diet$`Flux Value` = -1*(diet$`Flux Value`)/24
+diet = diet %>% rename(lwbnd = `Flux Value`) %>%
+  mutate(lwbnd = -(lwbnd)/24,
+         uppbwnd = 10)
+
 
 model = setDiet(model, dietf = diet)
 model = setDiet.name(model,diet_name = "EU_average")

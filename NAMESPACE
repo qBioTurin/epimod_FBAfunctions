@@ -3,6 +3,7 @@
 export(FBA4Greatmod.generation)
 export(FBAmat.read)
 export(getConstraints)
+export(getExchangesR)
 export(setConstraints)
 export(setDiet)
 export(setDiet.name)

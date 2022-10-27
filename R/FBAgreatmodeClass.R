@@ -114,6 +114,39 @@ setMethod(f="setObjFun",
           }
 )
 
+#' @aliases getExchangesR FBA_greatmod-methods
+#' @param theObject A `FBA_greatmod` object
+#' @docType methods
+#' @rdname FBA_greatmod-methods
+#' @return The constraints of the reaction.
+#' @export
+
+setGeneric(name="getExchangesR",
+           def=function(theObject,reaction.name)
+           {
+             standardGeneric("getExchangesR")
+           }
+)
+
+setMethod(f="getExchangesR",
+          signature=c("FBA_greatmod"),
+          definition=function(theObject)
+          {
+
+            S = theObject@S
+            mat_nonzero <- as.data.frame(which(S != 0, arr.ind = T) ) %>%
+              group_by(col) %>%
+              filter(length(col) == 1) %>%
+              ungroup() %>% select(col)
+            if(length(mat_nonzero$col) == 0)
+              stop("No exchange reaction was found!")
+            else
+              ExcR = theObject@react_id[mat_nonzero$col]
+
+            return(ExcR)
+          }
+)
+
 #' @aliases getConstraints FBA_greatmod-methods
 #' @param theObject A `FBA_greatmod` object
 #' @docType methods
