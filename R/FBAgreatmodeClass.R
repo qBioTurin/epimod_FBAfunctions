@@ -113,6 +113,35 @@ setMethod(f="setObjFun",
           }
 )
 
+#' @aliases getConstraints FBA_greatmod-methods
+#' @param theObject A `FBA_greatmod` object
+#' @docType methods
+#' @rdname FBA_greatmod-methods
+#' @return The constraints of the reaction.
+#' @export
+
+setGeneric(name="getConstraints",
+           def=function(theObject,reaction.name)
+           {
+             standardGeneric("getConstraints")
+           }
+)
+
+setMethod(f="getConstraints",
+          signature=c("FBA_greatmod","character"),
+          definition=function(theObject,reaction.name)
+          {
+            index.r = which(theObject@react_id == reaction.name)
+            if(length(index.r)==0)
+              stop("The reaction does not match any reaction name in the model.")
+
+            Constraints = c(theObject@uppbnd[index.r],
+                            theObject@lowbnd[index.r])
+
+            return(Constraints)
+          }
+)
+
 #' @aliases setConstraints FBA_greatmod-methods
 #' @param theObject A `FBA_greatmod` object
 #' @param reaction.name Character of the reaction name.
