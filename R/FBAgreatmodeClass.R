@@ -135,9 +135,11 @@ setMethod(f="getExchangesR",
 
             S = theObject@S
             mat_nonzero <- as.data.frame(which(S != 0, arr.ind = T) ) %>%
-              group_by(col) %>%
-              filter(length(col) == 1) %>%
-              ungroup() %>% select(col)
+              dplyr::group_by(col) %>%
+              dplyr::filter(length(col) == 1) %>%
+              dplyr::ungroup() %>%
+              dplyr::select(col)
+
             if(length(mat_nonzero$col) == 0)
               stop("No exchange reaction was found!")
             else
