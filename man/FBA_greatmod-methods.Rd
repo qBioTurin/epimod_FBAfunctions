@@ -24,7 +24,7 @@ setDiet.name(theObject, diet_name)
 writeFBAfile(theObject, fba_fname, ...)
 }
 \arguments{
-\item{theObject}{A `FBA_greatmod` object}
+\item{theObject}{A \code{FBA_greatmod} object}
 
 \item{reaction.name}{Character of the reaction name.}
 
@@ -34,7 +34,7 @@ writeFBAfile(theObject, fba_fname, ...)
 
 \item{diet_name}{Character for the diet name}
 
-\item{fba_fname}{The file name in which the FBA model will be saved. See *epimod::model.generation*.}
+\item{fba_fname}{The file name in which the FBA model will be saved. See \emph{epimod::model.generation}.}
 }
 \value{
 The constraints of the reaction.

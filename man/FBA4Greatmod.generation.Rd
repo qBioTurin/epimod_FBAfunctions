@@ -17,7 +17,7 @@ FBA4Greatmod.generation(
 \arguments{
 \item{fba_mat}{Matlab file .....}
 
-\item{fba_model}{List representing the FBA model generated from *FBAfile.generation*.}
+\item{fba_model}{List representing the FBA model generated from \emph{FBAfile.generation}.}
 
 \item{S}{Stoic matrix}
 
@@ -34,13 +34,13 @@ with one 1 in the position of the flux to maximize.}
 ....
 }
 \details{
-Problem: S*x = b -. size x = n and size of S = m X n
+Problem: S\emph{x = b -. size x = n and size of S = m X n
 With this function the file to pass to the GLPKsolver is generated:
 1st row) n_row n_col GLP_MAX (or GLP_MIN if the obj has to max or min)
 2nd row) the coeff for defining the obj function (the number of coeff has to be == length of x)
 m rows)   definition of the S row bounds (i.e. b)
 n rows)   definition of the x bounds
-m*n rows) definition of the S coeffs: row_index col_index value
+m}n rows) definition of the S coeffs: row_index col_index value
 }
 \author{
 Aucello Riccardo, Beccuti Marco, Cordero Francesca, Pernice Simone

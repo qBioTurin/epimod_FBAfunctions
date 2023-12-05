@@ -26,23 +26,27 @@
 
 FBA4Greatmod.generation = function(fba_mat=NULL,
                                    fba_model = NULL,
-                                   S=NULL,ub=NULL,lb=NULL,obj_fun=NULL,
-                                   react_name=NULL) {
+                                   S = NULL, 
+                                   ub = NULL,
+                                   lb = NULL, 
+                                   obj_fun = NULL,
+                                   react_name = NULL) {
 
   #### Checking the existence of all elements in fba_mat file
-
-  if(!is.null(fba_mat) && file.exists(fba_mat))
-  {
+  if( !is.null(fba_mat) && file.exists(fba_mat) ) 
+    {
+    
     modelMAT = FBAmat.read(fba_mat)
     model = FBA_greatmod(as.matrix(modelMAT$S),
                          modelMAT$uppbnd,
                          modelMAT$lowbnd,
                          c(modelMAT$obj_coef),
-                         modelMAT$react_id )
+                         modelMAT$react_id,
+                         modelMAT$met_id)
   }
   else if(!is.null(S) && !is.null(lb) && !is.null(ub) && !is.null(obj_fun) )
   {
-    model = FBA_greatmod(S, ub, lb, obj_fun,react_name)
+    model = FBA_greatmod(S, ub, lb, obj_fun, react_name)
   }
   else if(!is.null(fba_model))
   {

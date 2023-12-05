@@ -1,59 +1,57 @@
 #' @title Read matlab model
-#'
 #' @description The generic function \code{readMATmod} imports matlab cobra (ONLY) models into ....
-#'
 #' @param fba_mat Full path to matlab model file
-#'
-#' @details Returns .....
-#'
+#' @details Returns ...
 #' @author Aucello Riccardo, Beccuti Marco, Cordero Francesca, Pernice Simone
-#'
 #' @import R.matlab stringr
 #' @export
 
-FBAmat.read <- function(fba_mat){
-
-  data <- R.matlab::readMat(fba_mat)
-  dat.mat <- data[[1]]
-
-  mod.var <- dimnames(dat.mat)[[1]]
-
+FBAmat.read = function(fba_mat){
+  
+  data = R.matlab::readMat(fba_mat)
+  dat.mat = data[[1]]
+  
+  mod.var = dimnames(dat.mat)[[1]]
+  
   # 1) model name
   if( "modelID" %in% mod.var ){
-    mod.id <- as.character(dat.mat[[which(mod.var=="modelID")]])
-  }else{
-    mod.id <- names(data)[1]
+    mod.id = as.character(dat.mat[[which(mod.var == "modelID")]])
+  } else {
+    mod.id = names(data)[1]
   }
   if( "modelName" %in% mod.var ){
-    mod.name <- as.character(dat.mat[[which(mod.var=="modelName")]])
-  } else{
-    mod.name <- mod.id
+    mod.name = as.character(dat.mat[[which(mod.var == "modelName")]])
+  } else {
+    mod.name = mod.id
   }
   if( "description" %in% mod.var ){
-    mod.desc <- as.character(dat.mat[[which(mod.var=="description")]])
-  } else{
-    mod.desc <- mod.id
+    mod.desc = as.character(dat.mat[[which(mod.var == "description")]])
+  } else {
+    mod.desc = mod.id
   }
-
+  
   # 2) stoich matrix
-  mod.S <- Matrix(dat.mat[[which(mod.var=="S")]], sparse = T)
-
+  mod.S = Matrix(dat.mat[[which(mod.var == "S")]], sparse = T)
+  
   # 3) rxn
-  mod.react_id   <- unlist(dat.mat[[which(mod.var=="rxns")]])
-  mod.react_name <- unlist(dat.mat[[which(mod.var=="rxnNames")]])
+  mod.react_id = unlist(dat.mat[[which(mod.var == "rxns")]])
+  mod.react_name = unlist(dat.mat[[which(mod.var == "rxnNames")]])
+  
+  saveRDS(mod.react_name, file = "officialName.rds")
+  
   if( "rev" %in% mod.var ){
-    mod.react_rev  <- as.vector(dat.mat[[which(mod.var=="rev")]]) == TRUE
-  }else{
-    mod.react_rev  <- as.vector(dat.mat[[which(mod.var=="lb")]]) < 0
+    mod.react_rev = as.vector(dat.mat[[which(mod.var=="rev")]]) == TRUE
+  } else {
+    mod.react_rev = as.vector(dat.mat[[which(mod.var=="lb")]]) < 0
   }
-
+  
   # 4) met
   mod.met_id     <- unlist(dat.mat[[which(mod.var=="mets")]])
   mod.met_name   <- unlist(dat.mat[[which(mod.var=="metNames")]])
-
+  
   # 5) genes
   mod.gene_id      <- unname(unlist(dat.mat[[which(mod.var=="genes")]]))
-  if( "rxnGeneMat" %in% mod.var ){
+  if("rxnGeneMat" %in% mod.var){
     mod.GeneMat    <- dat.mat[[which(mod.var=="rxnGeneMat")]]
     mod.genes <- apply(mod.GeneMat, 1, function(row){
       x <- unname(mod.gene_id[which(row != 0)])
@@ -77,15 +75,20 @@ FBAmat.read <- function(fba_mat){
       mod.genes[[i]] <- mod.gene_id[j]
     }
   }
+  
+  saveRDS(mod.gene_id, file = "geni.rds")
+  
   # gpr rules needs to be converted (brackets + numbering)
-  if( "rules" %in% mod.var ){
-    mod.gprRules <- sapply(sapply(dat.mat[[which(mod.var=="rules")]], unlist), function(entry){
-      if( length(entry) == 0 ) ""
-      else {
-        numbers <- as.numeric(unlist(stringr::str_extract_all(entry, "[0-9]+")))
-        dict <- as.character(numbers - min(numbers) + 1); names(dict) <- as.character(numbers)
-        gsub("\\(([0-9]+)\\)","\\[\\1\\]",stringr::str_replace_all(entry, dict)) }
-    })
+  if( "grRules" %in% mod.var ){
+    extracted_element <- dat.mat[[which(mod.var=="grRules")]]
+    # Replace "numeric(0)" with ""
+    for (i in seq_along(extracted_element)) {
+      if (length(extracted_element[[i]][[1]]) == 0) {
+        extracted_element[[i]][[1]] <- ""
+      }
+    }
+    # Flatten the modified list
+    mod.gprRules <- as.vector(unlist(extracted_element))
   }else{ # if 'rules' is not present construct own rules from gpr+genes
     mod.gprRules <- sapply(seq_along(mod.gpr), function(i){
       if( mod.gpr[i] == "") ""
@@ -96,13 +99,34 @@ FBAmat.read <- function(fba_mat){
         gsub("and","&", gsub("or","|",stringr::str_replace_all(mod.gpr[i], dict)))
       }
     })
-
+    
   }
-
+  
+  saveRDS(mod.gprRules, file = "GRrules.rds")
+  
+  genes = c()
+  
+  for (i in 1:length(mod.gprRules)) {
+    
+    txt = mod.gprRules[i]
+    txt1 = gsub("\\(",replacement = "", txt )
+    txt1 = gsub("\\)",replacement = "", txt1 )
+    
+    genes = c(genes, unlist(strsplit(txt1, "( and | or )")))
+    
+  }
+  
+  genes = unique(genes)
+  genes = gsub(" ", replacement = "", genes)
+  genes = unlist(strsplit(genes, "(and|or)"))
+  genes = unique(genes)
+  
+  saveRDS(genes, file = "genesfromGRrules.rds")
+  
   # 6) bounds
   mod.lb <- as.vector(dat.mat[[which(mod.var=="lb")]])
   mod.ub <- as.vector(dat.mat[[which(mod.var=="ub")]])
-
+  
   # 7) compartments
   met_comp <- stringr::str_extract_all(mod.met_id, "(?<=\\[)[a-z](?=\\])")
   if( all(sapply(met_comp, length) == 0 ) ){
@@ -110,18 +134,87 @@ FBAmat.read <- function(fba_mat){
   }
   mod.mod_compart <- unique(unlist(met_comp))
   mod.met_comp    <- match(met_comp, mod.mod_compart)
-
+  
   # 8) subsystems
-  sub <- sapply(dat.mat[[which(mod.var=="subSystems")]], unlist)
-  sub.unique <- unique(sub)
-  mod.subSys <- Matrix(FALSE, nrow = length(sub), ncol = length(sub.unique), sparse=T)
+  
+  sub = sapply(dat.mat[[which(mod.var == "subSystems")]], unlist)
+  sub.unique = unique(sub)
+  
+  mod.subSys = Matrix(FALSE, nrow = length(sub), ncol = length(sub.unique), sparse=T)
+  
   for(i in 1:length(sub)){
+    
     j <- match(sub[i], sub.unique)
     mod.subSys[i,j] <- TRUE
+    
   }
+  
   colnames(mod.subSys) <- sub.unique
-
-
+  
+  saveRDS(sub, file = "subsystem.rds")
+  
+  # 9) metKEGGID
+  
+  if( "metKEGGID" %in% mod.var ) {
+    
+    met.KEGGID = dat.mat[[which(mod.var=="metKEGGID")]]
+    met_KEGGID = c()
+    
+    for(i in 1:length(met.KEGGID)) {
+      if(length(met.KEGGID[[i]][[1]]) == 0) {
+        met_KEGGID[i] = NA
+      } else {
+        met_KEGGID[i] = met.KEGGID[[i]][[1]]
+      }
+    }
+    
+    met.KEGGID = data.frame(met_id = mod.met_id, met_KEGGID)
+    saveRDS(met.KEGGID, file = "met_KEGGID.rds")
+    
+  }
+  
+  # 10) rxnKEGGID
+  
+  if( "rxnKEGGID" %in% mod.var ) {
+    
+    rxn.KEGGID = dat.mat[[which(mod.var=="rxnKEGGID")]]
+    rxn_KEGGID = c()
+    
+    for(i in 1:length(rxn.KEGGID)) {
+      if(length(rxn.KEGGID[[i]][[1]]) == 0) {
+        rxn_KEGGID[i] = NA
+      } else {
+        rxn_KEGGID[i] = rxn.KEGGID[[i]][[1]]
+      }
+    }
+    
+    rxn.KEGGID = data.frame(react_id = mod.react_id, rxn_KEGGID)
+    saveRDS(rxn.KEGGID, file = "rxn_KEGGID.rds")
+    
+  }
+  
+  # 11) rxnKeggOrthology
+  
+  if( "rxnKeggOrthology" %in% mod.var ) {
+    
+    rxn.KeggOrthology = dat.mat[[which(mod.var=="rxnKEGGID")]]
+    rxn_KeggOrthology = c()
+    
+    for(i in 1:length(rxn.KeggOrthology)) {
+      if(length(rxn.KeggOrthology[[i]][[1]]) == 0) {
+        rxn_KeggOrthology[i] = NA
+      } else {
+        rxn_KeggOrthology[i] = rxn.KeggOrthology[[i]][[1]]
+      }
+    }
+    
+    rxn.KeggOrthology = data.frame(react_id = mod.react_id, rxn_KeggOrthology)
+    saveRDS(rxn.KeggOrthology, file = "rxn_KeggOrthology.rds")
+    
+    # see -> https://webdav-r3lab.uni.lu/public/msp/Mol-Files/atomMappedExplicit/png/
+    
+  }
+  
   # create new model
   # model = FBAgreatmod.classGeneration()
   #
@@ -144,13 +237,21 @@ FBAmat.read <- function(fba_mat){
   # model$mod_compart <- mod.mod_compart
   # model$met_comp <- mod.met_comp
   # model$subSys <- mod.subSys
-
+  
+  mod.react_id = gsub("\\(", replacement = "_", mod.react_id)
+  mod.react_id = gsub("\\[", replacement = "_", mod.react_id)
+  mod.react_id = gsub("\\)", replacement = "", mod.react_id)
+  mod.react_id = gsub("\\]", replacement = "", mod.react_id)
+  mod.react_id = gsub("_c_", replacement = "_c", mod.react_id)
+  mod.react_id = gsub("__", replacement = "_", mod.react_id)
+  
   return(
     list(
       S = mod.S,
       lowbnd = mod.lb,
       uppbnd = mod.ub,
       react_id = mod.react_id,
+      met_id = mod.met_id,
       obj_coef = dat.mat[[which(mod.var == "c")]]
     )
   )
