@@ -80,15 +80,13 @@ FBAmat.read = function(fba_mat){
   
   # gpr rules needs to be converted (brackets + numbering)
   if( "grRules" %in% mod.var ){
-    extracted_element <- dat.mat[[which(mod.var=="grRules")]]
-    # Replace "numeric(0)" with ""
-    for (i in seq_along(extracted_element)) {
-      if (length(extracted_element[[i]][[1]]) == 0) {
-        extracted_element[[i]][[1]] <- ""
-      }
-    }
-    # Flatten the modified list
-    mod.gprRules <- as.vector(unlist(extracted_element))
+    mod.gprRules <- sapply(sapply(dat.mat[[which(mod.var=="grRules")]], unlist), function(entry){
+      if( length(entry) == 0 ) ""
+      else {
+        numbers <- as.numeric(unlist(stringr::str_extract_all(entry, "[0-9]+")))
+        dict <- as.character(numbers - min(numbers) + 1); names(dict) <- as.character(numbers)
+        gsub("\\(([0-9]+)\\)","\\[\\1\\]", stringr::str_replace_all(entry, dict)) }
+    })
   }else{ # if 'rules' is not present construct own rules from gpr+genes
     mod.gprRules <- sapply(seq_along(mod.gpr), function(i){
       if( mod.gpr[i] == "") ""
@@ -102,7 +100,7 @@ FBAmat.read = function(fba_mat){
     
   }
   
-  saveRDS(mod.gprRules, file = "GRrules.rds")
+  saveRDS(mod.gprRules, file = "geneAssociation.rds")
   
   genes = c()
   
@@ -121,7 +119,7 @@ FBAmat.read = function(fba_mat){
   genes = unlist(strsplit(genes, "(and|or)"))
   genes = unique(genes)
   
-  saveRDS(genes, file = "genesfromGRrules.rds")
+  saveRDS(genes, file = "genesFromGeneAss.rds")
   
   # 6) bounds
   mod.lb <- as.vector(dat.mat[[which(mod.var=="lb")]])
@@ -243,7 +241,6 @@ FBAmat.read = function(fba_mat){
   mod.react_id = gsub("\\)", replacement = "", mod.react_id)
   mod.react_id = gsub("\\]", replacement = "", mod.react_id)
   mod.react_id = gsub("_c_", replacement = "_c", mod.react_id)
-  mod.react_id = gsub("__", replacement = "_", mod.react_id)
   
   return(
     list(
