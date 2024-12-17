@@ -79,15 +79,23 @@ FBAmat.read = function(fba_mat){
   saveRDS(mod.gene_id, file = "geni.rds")
   
   # gpr rules needs to be converted (brackets + numbering)
-  if( "grRules" %in% mod.var ){
-    mod.gprRules <- sapply(sapply(dat.mat[[which(mod.var=="grRules")]], unlist), function(entry){
-      if( length(entry) == 0 ) ""
-      else {
-        numbers <- as.numeric(unlist(stringr::str_extract_all(entry, "[0-9]+")))
-        dict <- as.character(numbers - min(numbers) + 1); names(dict) <- as.character(numbers)
-        gsub("\\(([0-9]+)\\)","\\[\\1\\]", stringr::str_replace_all(entry, dict)) }
-    })
-  }else{ # if 'rules' is not present construct own rules from gpr+genes
+	if( "grRules" %in% mod.var ){
+		mod.gprRules <- sapply(sapply(dat.mat[[which(mod.var=="grRules")]], unlist), function(entry){
+		  if (length(entry) == 0) {
+		    ""
+		  } else {
+		    numbers <- as.numeric(unlist(stringr::str_extract_all(entry, "[0-9]+")))
+		    
+		    if (length(numbers) == 0) {
+		      ""
+		    } else {
+		      dict <- as.character(numbers - min(numbers) + 1)
+		      names(dict) <- as.character(numbers)
+		      gsub("\\(([0-9]+)\\)","\\[\\1\\]", stringr::str_replace_all(entry, dict))
+		    }
+		  }
+		})
+	}else{ # if 'rules' is not present construct own rules from gpr+genes
     mod.gprRules <- sapply(seq_along(mod.gpr), function(i){
       if( mod.gpr[i] == "") ""
       else{

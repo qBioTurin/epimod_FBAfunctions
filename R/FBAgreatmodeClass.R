@@ -17,7 +17,11 @@ setClass(
     dietName = "character",
     dietValues = "data.frame",
     lowbnd_beforeDiet = "numeric",
-    uppbnd_beforeDiet = "numeric"
+    uppbnd_beforeDiet = "numeric",
+    #biomass values
+    bioMax = "numeric",
+    bioMean = "numeric",
+    bioMin = "numeric"
   )
 )
 
@@ -25,12 +29,12 @@ setClass(
 #                              user constructor                                #
 #------------------------------------------------------------------------------#
 
-FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL) {
+FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL, bioMax = -1, bioMean = -1, bioMin = -1) {
   if (missing(S) || missing(ub) || missing(lb) || missing(obj_fun) ) {
     stop("Creating an object of class model needs: S, ub, lb, obj_fun!")
   }
   
-  obj <- new("FBA_greatmod", S, ub, lb, obj_fun, react_name, met_name)
+  obj <- new("FBA_greatmod", S, ub, lb, obj_fun, react_name, met_name, bioMax, bioMean, bioMin)
   
   stopifnot(validObject(obj))
   
@@ -70,7 +74,11 @@ setMethod(f = "initialize",
           signature("FBA_greatmod"),
           definition = function(.Object, S, ub, lb, obj_fun,
                                 react_name=NULL,
-                                met_name=NULL) {
+                                met_name=NULL,
+                                bioMax = -1,
+                                bioMean = -1,
+                                bioMin = -1
+                                ) {
             
             if ( (!missing(S)) || (!missing(ub)) || (!missing(lb)) || (!missing(obj_fun)) ) {
               
@@ -78,6 +86,9 @@ setMethod(f = "initialize",
               .Object@lowbnd = lb
               .Object@uppbnd = ub
               .Object@obj_coef = obj_fun
+              .Object@bioMax = bioMax
+              .Object@bioMean = bioMean
+              .Object@bioMin = bioMin                           
               
               ncol = length(.Object@S[1, ])
               nrow = length(.Object@S[, 1])
@@ -326,6 +337,10 @@ setMethod(f="setDiet.name",
           }
 )
 
+
+library(Rcpp)
+sourceCpp(paste0(wd, "/epimod_FBAfunctions/R/", "writeFBAfile.cpp")) 
+
 #' @description Write the fba model in file.
 #' @name FBA_greatmod-methods
 #' @aliases writeFBAfile FBA_greatmod-methods
@@ -336,66 +351,53 @@ setMethod(f="setDiet.name",
 #' @export
 #'
 setGeneric(name="writeFBAfile",
-           def=function(theObject,fba_fname,...)
+           def=function(theObject,fba_fname,dest_dir,...)
            {
              standardGeneric("writeFBAfile")
            }
 )
 
+
+
 setMethod(f="writeFBAfile",
-          signature=c("FBA_greatmod","character"),
-          definition=function(theObject,fba_fname=NULL,...)
-          {
-            if(is.null(fba_fname))
-              fba_fname = "fba_file"
-            
-            print(fba_fname)
-            
-            ReactionsNames <- unlist(theObject@react_id)
-            
-            theObject@S -> S
-            
-            ncol = length(S[1, ])
-            nrow = length(S[, 1])
-            
-            ## Da prevedere che uno possa cambiare b (di default 0 per FBA)
-            matrix(0, nrow = ncol, ncol = 1) -> b
-            #
-            as.matrix(theObject@lowbnd) -> lb
-            as.matrix(theObject@uppbnd) -> ub
-            c(theObject@obj_coef) -> obj
-            
-            #### Start writing the file to pass to GLPK solver
-            
-            print(">> [Writing] Initialization of the file ...")
-            
-            rb <- cbind(b,b)
-            cb <- cbind(lb,ub)
-            
-            print(">> [Writing] Reactions name ...")
-            write(paste(ReactionsNames, collapse = " "), file = fba_fname)
-            
-            ## Da prevedere che uno possa mettere MIN
-            
-            print(">> [Writing] Objective function ...")
-            write(paste0(nrow," ; ",ncol," ; ","GLP_MAX" ),file = fba_fname, append = T)
-            write(paste(obj, collapse = " "),file = fba_fname,append = T )
-            
-            print(">> [Writing] Costraints ...")
-            for(i in 1:nrow) {
-              write(paste0("GLP_F"," ; ",paste0(rb[i,],collapse = " ; ") ),file = fba_fname ,append = T)
-            }
-            
-            ## Da prevedere che uno possa cambiare i tipi di bounds
-            for(j in 1:ncol){
-              write(paste0("GLP_DB"," ; ",paste0(cb[j,],collapse = " ; ")),file = fba_fname ,append = T)
-            }
-            print(">> [Writing] Stoichiometric matrix ...")
-            for(i in 1:nrow) {
-              for(j in 1:ncol){
-                write(paste0(i," ; ", j, " ; ", S[i,j]),file = fba_fname ,append = T)
-              }
-            }
-            print(">> [Writing] End.")
+          signature=c("FBA_greatmod", "character"),
+          definition=function(theObject, fba_fname=NULL, dest_dir=NULL, ...) {
+              if (is.null(fba_fname)) 
+                  fba_fname <- "fba_file.txt"
+										    
+							S <- as.matrix(model@S)
+							react_id <- unlist(model@react_id)
+							obj_coef <- c(model@obj_coef)
+							lowbnd <- as.matrix(model@lowbnd)
+							uppbnd <- as.matrix(model@uppbnd)
+							bioMax <- theObject@bioMax
+							bioMean <- theObject@bioMean
+							bioMin <- theObject@bioMin
+							write <- TRUE
+							
+							
+							ncol = length(S[1, ])
+							nrow = length(S[, 1])
+							
+							matrix(0, nrow = ncol, ncol = 1) -> b
+							
+							
+            	rb <- cbind(b,b)
+              
+              # Call the C++ function
+              writeModelCpp(S = S, react_id = react_id, obj_coef = obj_coef,
+                            lowbnd = lowbnd, uppbnd = uppbnd, rb = rb,
+                            model_name = model_name, write = write, wd = dest_dir, bioMax = bioMax, bioMean = bioMean, bioMin = bioMin
+                           )
           }
 )
+
+setGeneric("setBiomassParameters", function(object, bioMax, bioMean, bioMin) standardGeneric("setBiomassParameters"))
+
+setMethod("setBiomassParameters", signature = "FBA_greatmod", definition = function(object, bioMax, bioMean, bioMin) {
+  object@bioMax <- bioMax
+  object@bioMean <- bioMean
+  object@bioMin <- bioMin
+  return(object)
+})
+
