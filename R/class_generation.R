@@ -43,8 +43,9 @@ FBA4Greatmod.generation = function(fba_mat=NULL,
                          modelMAT$lowbnd,
                          c(modelMAT$obj_coef),
                          modelMAT$react_id,
-                         modelMAT$met_id
-												 )
+                         modelMAT$met_id,
+                         gene_assoc = modelMAT$gene_assoc 
+												)
   }
   else if(!is.null(S) && !is.null(lb) && !is.null(ub) && !is.null(obj_fun) )
   {

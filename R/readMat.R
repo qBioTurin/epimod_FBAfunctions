@@ -50,33 +50,53 @@ FBAmat.read = function(fba_mat){
   mod.met_name   <- unlist(dat.mat[[which(mod.var=="metNames")]])
   
   # 5) genes
-  mod.gene_id      <- unname(unlist(dat.mat[[which(mod.var=="genes")]]))
-  if("rxnGeneMat" %in% mod.var){
-    mod.GeneMat    <- dat.mat[[which(mod.var=="rxnGeneMat")]]
-    mod.genes <- apply(mod.GeneMat, 1, function(row){
-      x <- unname(mod.gene_id[which(row != 0)])
-      if( length(x)==0 ) "" else x })
-    mod.gpr        <- sapply(sapply(dat.mat[[which(mod.var=="grRules")]], unlist), function(entry){
-      if ( length(entry) == 0 ) "" else unname(entry)
-    })
-  }else{ # if gene matrix not present create it
-    mod.GeneMat <- Matrix(0,nrow = length(mod.react_id), ncol = length(mod.gene_id))
-    mod.genes <- list()
-    rules.list <- unlist(dat.mat[[which(mod.var=="rules")]], recursive = F)
-    if( length(rules.list) != length(mod.react_id) ) stop("Length of rules not same as length of reactions.")
-    for(i in seq_along(mod.react_id)  ){
-      rule.tmp <- rules.list[[i]]
-      if( length(rule.tmp) == 0 ){
-        mod.genes[[i]] <- ""
-        next
-      }
-      j <- as.numeric(unlist(stringr::str_extract_all(rule.tmp, "(?<=x\\()[0-9]+?(?=\\))")))
-      mod.GeneMat[i,j] <- 1
-      mod.genes[[i]] <- mod.gene_id[j]
-    }
-  }
-  
-  saveRDS(mod.gene_id, file = "geni.rds")
+	mod.gene_id <- unname(unlist(dat.mat[[which(mod.var=="genes")]]))
+
+	if ("rxnGeneMat" %in% mod.var) {
+		mod.GeneMat <- dat.mat[[which(mod.var == "rxnGeneMat")]]
+		
+		mod.genes <- apply(mod.GeneMat, 1, function(row) {
+		  x <- unname(mod.gene_id[which(row != 0)])
+		  if (length(x) == 0) "" else x
+		})
+		mod.gpr <- sapply(sapply(dat.mat[[which(mod.var == "grRules")]], unlist),
+		                  function(entry) {
+		                    if (length(entry) == 0) "" else unname(entry)
+		                  })
+		
+		# Calcolo isGeneAssociated
+		isGeneAssociated <- apply(mod.GeneMat != 0, 1, any)   # vettore TRUE/FALSE di lunghezza nReactions
+		isGeneAssociated_num <- as.numeric(isGeneAssociated)  # convertito in 0/1
+
+	} else {
+		# if gene matrix not present create it
+		mod.GeneMat <- Matrix(0, nrow = length(mod.react_id), ncol = length(mod.gene_id))
+		mod.genes <- list()
+		rules.list <- unlist(dat.mat[[which(mod.var == "rules")]], recursive = FALSE)
+		
+		if (length(rules.list) != length(mod.react_id))
+		  stop("Length of rules not same as length of reactions.")
+		
+		for (i in seq_along(mod.react_id)) {
+		  rule.tmp <- rules.list[[i]]
+		  if (length(rule.tmp) == 0) {
+		    mod.genes[[i]] <- ""
+		    next
+		  }
+		  j <- as.numeric(
+		    unlist(stringr::str_extract_all(rule.tmp, "(?<=x\\()[0-9]+?(?=\\))"))
+		  )
+		  mod.GeneMat[i, j] <- 1
+		  mod.genes[[i]] <- mod.gene_id[j]
+		}
+		
+		# Calcolo isGeneAssociated
+		isGeneAssociated <- apply(mod.GeneMat != 0, 1, any)
+		isGeneAssociated_num <- as.numeric(isGeneAssociated)
+	}
+
+	saveRDS(mod.gene_id, file = "geni.rds")
+
   
   # gpr rules needs to be converted (brackets + numbering)
 	if( "grRules" %in% mod.var ){
@@ -257,7 +277,8 @@ FBAmat.read = function(fba_mat){
       uppbnd = mod.ub,
       react_id = mod.react_id,
       met_id = mod.met_id,
-      obj_coef = dat.mat[[which(mod.var == "c")]]
+      obj_coef = dat.mat[[which(mod.var == "c")]],
+      gene_assoc = isGeneAssociated_num
     )
   )
 }

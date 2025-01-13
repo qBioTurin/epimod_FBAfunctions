@@ -21,7 +21,8 @@ setClass(
     #biomass values
     bioMax = "numeric",
     bioMean = "numeric",
-    bioMin = "numeric"
+    bioMin = "numeric",
+    gene_assoc = "numeric"
   )
 )
 
@@ -29,12 +30,17 @@ setClass(
 #                              user constructor                                #
 #------------------------------------------------------------------------------#
 
-FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL, bioMax = -1, bioMean = -1, bioMin = -1) {
+FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL, bioMax = -1, bioMean = -1, bioMin = -1, gene_assoc = NULL) {
   if (missing(S) || missing(ub) || missing(lb) || missing(obj_fun) ) {
     stop("Creating an object of class model needs: S, ub, lb, obj_fun!")
   }
   
-  obj <- new("FBA_greatmod", S, ub, lb, obj_fun, react_name, met_name, bioMax, bioMean, bioMin)
+  obj <- new("FBA_greatmod",
+             S, ub, lb, obj_fun,
+             react_name, met_name,
+             bioMax, bioMean, bioMin,
+             gene_assoc  
+            )
   
   stopifnot(validObject(obj))
   
@@ -75,38 +81,52 @@ setMethod(f = "initialize",
           definition = function(.Object, S, ub, lb, obj_fun,
                                 react_name=NULL,
                                 met_name=NULL,
-                                bioMax = -1,
-                                bioMean = -1,
-                                bioMin = -1
-                                ) {
-            
-            if ( (!missing(S)) || (!missing(ub)) || (!missing(lb)) || (!missing(obj_fun)) ) {
-              
-              .Object@S <- as.matrix(S)
-              .Object@lowbnd = lb
-              .Object@uppbnd = ub
-              .Object@obj_coef = obj_fun
-              .Object@bioMax = bioMax
-              .Object@bioMean = bioMean
-              .Object@bioMin = bioMin                           
-              
-              ncol = length(.Object@S[1, ])
-              nrow = length(.Object@S[, 1])
-              
-              if(missing(react_name))
-                .Object@react_id = paste0("Reaction", 1:ncol)
-              else
-                .Object@react_id = react_name
-              
-              if(missing(met_name))
-                .Object@met_id = paste0("Metabolite", 1:nrow)
-              else
-                .Object@met_id = met_name
-              
+                                bioMax=-1,
+                                bioMean=-1,
+                                bioMin=-1,
+                                gene_assoc=NULL
+                                ) 
+          {
+            # Campi già esistenti...
+            .Object@S       <- as.matrix(S)
+            .Object@lowbnd  <- lb
+            .Object@uppbnd  <- ub
+            .Object@obj_coef<- obj_fun
+            .Object@bioMax  <- bioMax
+            .Object@bioMean <- bioMean
+            .Object@bioMin  <- bioMin
+
+            ncol <- ncol(.Object@S)
+            nrow <- nrow(.Object@S)
+
+            # Reazioni (react_name)
+            if(is.null(react_name)) {
+              .Object@react_id = paste0("Reaction", 1:ncol)
+            } else {
+              .Object@react_id = react_name
             }
+            # Metaboliti (met_name)
+            if(is.null(met_name)) {
+              .Object@met_id = paste0("Metabolite", 1:nrow)
+            } else {
+              .Object@met_id = met_name
+            }
+
+            # NUOVO: assegno lo slot gene_assoc
+            if(!is.null(gene_assoc)) {
+              if(length(gene_assoc) != ncol) {
+                stop("gene_assoc must have length equal to the number of reactions (ncol of S).")
+              }
+              .Object@gene_assoc <- gene_assoc
+            } else {
+              # se non lo passi, lo inizializzi a zero o vector numeric(0)
+              .Object@gene_assoc <- rep(0, ncol)
+            }
+
             return(.Object)
           }
 )
+
 
 
 
@@ -360,37 +380,53 @@ setGeneric(name="writeFBAfile",
 
 
 setMethod(f="writeFBAfile",
-          signature=c("FBA_greatmod", "character"),
-          definition=function(theObject, fba_fname=NULL, dest_dir=NULL, ...) {
-              if (is.null(fba_fname)) 
-                  fba_fname <- "fba_file.txt"
-										    
-							S <- as.matrix(model@S)
-							react_id <- unlist(model@react_id)
-							obj_coef <- c(model@obj_coef)
-							lowbnd <- as.matrix(model@lowbnd)
-							uppbnd <- as.matrix(model@uppbnd)
-							bioMax <- theObject@bioMax
-							bioMean <- theObject@bioMean
-							bioMin <- theObject@bioMin
-							write <- TRUE
-							
-							
-							ncol = length(S[1, ])
-							nrow = length(S[, 1])
-							
-							matrix(0, nrow = ncol, ncol = 1) -> b
-							
-							
-            	rb <- cbind(b,b)
-              
-              # Call the C++ function
-              writeModelCpp(S = S, react_id = react_id, obj_coef = obj_coef,
-                            lowbnd = lowbnd, uppbnd = uppbnd, rb = rb,
-                            model_name = model_name, write = write, wd = dest_dir, bioMax = bioMax, bioMean = bioMean, bioMin = bioMin
-                           )
-          }
+  signature=c("FBA_greatmod", "character"),
+  definition=function(theObject, fba_fname=NULL, dest_dir=NULL, ...) {
+    if (is.null(fba_fname)) {
+      fba_fname <- "fba_file.txt"
+    }
+    
+    # Usa theObject invece di model
+    S         <- as.matrix(theObject@S)
+    react_id  <- unlist(theObject@react_id)
+    obj_coef  <- c(theObject@obj_coef)
+    lowbnd    <- as.matrix(theObject@lowbnd)
+    uppbnd    <- as.matrix(theObject@uppbnd)
+    bioMax    <- theObject@bioMax
+    bioMean   <- theObject@bioMean
+    bioMin    <- theObject@bioMin
+    gen_assoc <- theObject@gene_assoc
+    
+    # Dichiariamo la variabile model_name (così come serve nel C++):
+    model_name <- fba_fname  # se vuoi che il file si chiami come fba_fname
+    write <- TRUE
+
+    ncol <- ncol(S)
+    nrow <- nrow(S)
+    
+    # Creiamo la matrice rb di vincoli
+    b <- matrix(0, nrow = ncol, ncol = 1)
+    rb <- cbind(b,b)
+    
+    # Chiamata alla funzione C++:
+    writeModelCpp(
+      S          = S,
+      react_id   = react_id,
+      obj_coef   = obj_coef,
+      lowbnd     = lowbnd,
+      uppbnd     = uppbnd,
+      rb         = rb,
+      gene_assoc = gen_assoc,
+      model_name = model_name,  # <--- passiamo la stringa
+      write      = write,
+      wd         = dest_dir,
+      bioMax     = bioMax,
+      bioMean    = bioMean,
+      bioMin     = bioMin
+    )
+  }
 )
+
 
 setGeneric("setBiomassParameters", function(object, bioMax, bioMean, bioMin) standardGeneric("setBiomassParameters"))
 

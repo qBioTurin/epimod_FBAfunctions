@@ -22,36 +22,52 @@ using namespace std;
  * @param lowbnd NumericVector, the lower bounds for the variables.
  * @param uppbnd NumericVector, the upper bounds for the variables.
  * @param rb NumericVector, the right-hand side coefficients of the constraints, assuming all are equalities.
+ * @param gene_assoc NumericVector, a 0/1 flag indicating if each reaction is gene-associated (same order as react_id).
  * @param model_name string, the base name for the output file, which will be saved as <model_name>.txt.
  * @param write bool, controls whether the file is actually written; if false, the function returns immediately.
- * @param wd string, the working directory where the file will be saved, specifically in a subdirectory 'data'.
+ * @param wd string, the working directory where the file will be saved.
  * @param bioMax double, the maximum biomass this model can achieve (default -1 if unspecified).
  * @param bioMean double, the average biomass for this species (default -1 if unspecified).
+ * @param bioMin double, the minimum biomass for this species (default -1 if unspecified).
  *
  * @details
- * The output format is as follows:
+ * The output format is as follows (with one extra line for gene_assoc):
  * - Line 1: Space-separated reaction IDs.
- * - Line 2: Two integers representing the dimensions of matrix S and the string "GLP_MAX" indicating a maximization problem.
- * - Line 3: The total number of non-zero entries in the matrix.
- * - Line 4: Biomax value.
- * - Line 5: Biomean value.
- * - Subsequent lines: Each non-zero entry in S formatted as "row_index ; column_index ; value".
- * - Followed by objective coefficients, one per line.
- * - Then, bounds for each constraint (row) formatted as "GLP_FX ; lower_bound ; upper_bound".
- * - Finally, bounds for each variable (column) formatted as "GLP_DB ; lower_bound ; upper_bound".
- *
- * Example:
- * writeModelCpp(S, react_id, obj_coef, lowbnd, uppbnd, rb, "example_model", true, "/my/directory", 0.75, 0.45);
+ * - Line 2: Space-separated 0/1 flags for whether each reaction is gene-associated.
+ * - Line 3: "nrow ; ncol ; GLP_MAX"
+ * - Line 4: The total number of non-zero entries in the matrix S (nnz).
+ * - Line 5: Biomax value.
+ * - Line 6: Biomean value.
+ * - Line 7: Biomin value.
+ * - Line 8: The objective coefficients (obj_coef).
+ * - Next m lines (row bounds), Next n lines (column bounds),
+ * - Finally the non-zero matrix entries of S, formatted "row_index ; col_index ; value".
  */
 
 // [[Rcpp::export]]
-void writeModelCpp(NumericMatrix S, CharacterVector react_id, NumericVector obj_coef, NumericVector lowbnd, NumericVector uppbnd, NumericVector rb, string model_name, bool write, string wd, double bioMax = -1, double bioMean = -1, double bioMin = -1) {
-    if (!write) return;
+void writeModelCpp(NumericMatrix S,
+                   CharacterVector react_id,
+                   NumericVector obj_coef,
+                   NumericVector lowbnd,
+                   NumericVector uppbnd,
+                   NumericVector rb,
+                   NumericVector gene_assoc, // <--- Nuovo argomento
+                   string model_name,
+                   bool write,
+                   string wd,
+                   double bioMax = -1,
+                   double bioMean = -1,
+                   double bioMin = -1)
+{
+    if (!write) {
+      Rcout << "Skipping file writing (write=false)" << std::endl;
+      return;
+    }
 
     int nrow = S.nrow();
     int ncol = S.ncol();
 
-    // Prepare the file path and open the file
+    // Prepara il path e apri il file
     string fileName = wd + model_name + ".txt";
     ofstream file(fileName);
     if (!file.is_open()) {
@@ -59,69 +75,76 @@ void writeModelCpp(NumericMatrix S, CharacterVector react_id, NumericVector obj_
         return;
     }
 
-    // Buffer for all file content
+    // Buffer per tutto il contenuto
     stringstream buffer;
 
-    // Write the reaction IDs as a single line
+    // 1) Scriviamo i nomi delle reazioni (unica riga, spazio-separati)
     for (int i = 0; i < react_id.size(); i++) {
         buffer << as<string>(react_id[i]);
-        if (i < react_id.size() - 1) buffer << " "; // Add spaces between IDs, not after the last
+        if (i < react_id.size() - 1) buffer << " ";
     }
-    buffer << '\n';  // New line after IDs
+    buffer << "\n";
 
-    // Write the matrix dimensions and problem type
-    buffer << nrow << " ; " << ncol << " ; GLP_MAX" << '\n';
+    // 2) Scriviamo la riga con gene_assoc (unica riga, spazio-separati)
+    for (int i = 0; i < gene_assoc.size(); i++) {
+        buffer << gene_assoc[i];
+        if (i < gene_assoc.size() - 1) buffer << " ";
+    }
+    buffer << "\n";
 
-    // Initialize the non-zero element counter
+    // 3) Dimensioni e tipo di problema
+    buffer << nrow << " ; " << ncol << " ; GLP_MAX\n";
+
+    // 4) Prepariamo i dati della matrice S (solo i non-zero)
     int nnz = 0;
     stringstream matrixData;
+    matrixData << scientific; // notazione scientifica
 
-    // Use scientific notation for floating point numbers
-    matrixData << scientific;
-
-    // Process the matrix for non-zero elements
     for (int i = 0; i < nrow; i++) {
         for (int j = 0; j < ncol; j++) {
-            if (S(i, j) != 0) {
-                matrixData << (i + 1) << " ; " << (j + 1) << " ; " << S(i, j) << '\n';
+            if (S(i, j) != 0.0) {
+                matrixData << (i + 1) << " ; "
+                           << (j + 1) << " ; "
+                           << S(i, j) << "\n";
                 nnz++;
-           }
+            }
         }
     }
 
-    // Write the number of non-zero elements
-    buffer << nnz << '\n';
-    
-    // Write BioMax, BioMin, BioMean
-    buffer << bioMax << '\n';
-    buffer << bioMean << '\n';
-    buffer << bioMin << '\n';
-    
+    // 5) Scriviamo il numero di elementi non-zero
+    buffer << nnz << "\n";
 
-    // Write the objective coefficients
+    // 6) BioMax, BioMean, BioMin
+    buffer << bioMax << "\n";
+    buffer << bioMean << "\n";
+    buffer << bioMin << "\n";
+
+    // 7) Coefficienti obiettivo (unica riga)
     for (int i = 0; i < obj_coef.size(); i++) {
         buffer << obj_coef[i];
         if (i < obj_coef.size() - 1) buffer << " ";
     }
-    buffer << '\n';
+    buffer << "\n";
 
-    // Write row bounds (constraints)
+    // 8) Row bounds (constraints, dimensione nrow)
+    //    ipotizziamo "GLP_FX" e i = row
+    //    rb[i] come valore di eq
     for (int i = 0; i < nrow; i++) {
-        buffer << "GLP_FX ; " << rb[i] << " ; " << rb[i] << '\n';
+        buffer << "GLP_FX ; " << rb[i] << " ; " << rb[i] << "\n";
     }
 
-    // Write column bounds (variables)
+    // 9) Column bounds (variables, dimensione ncol)
+    //    lowbnd[j] e uppbnd[j]
     for (int j = 0; j < ncol; j++) {
-        buffer << "GLP_DB ; " << lowbnd[j] << " ; " << uppbnd[j] << '\n';
+        buffer << "GLP_DB ; " << lowbnd[j] << " ; " << uppbnd[j] << "\n";
     }
 
-    // Append matrix data
+    // 10) Aggiungiamo le righe della matrice S non-zero
     buffer << matrixData.str();
 
-    // Write everything from buffer to file
+    // Fine: scriviamo il buffer nel file
     file << buffer.str();
     file.close();
     Rcout << "File written to: " << fileName << endl;
 }
-
 
