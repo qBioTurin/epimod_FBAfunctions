@@ -22,7 +22,8 @@ setClass(
     bioMax = "numeric",
     bioMean = "numeric",
     bioMin = "numeric",
-    gene_assoc = "numeric"
+    gene_assoc = "numeric",
+    pFBAFlag = "numeric"
   )
 )
 
@@ -30,7 +31,7 @@ setClass(
 #                              user constructor                                #
 #------------------------------------------------------------------------------#
 
-FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL, bioMax = -1, bioMean = -1, bioMin = -1, gene_assoc = NULL) {
+FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL, bioMax = -1, bioMean = -1, bioMin = -1, gene_assoc = NULL, pFBAFlag = -1) {
   if (missing(S) || missing(ub) || missing(lb) || missing(obj_fun) ) {
     stop("Creating an object of class model needs: S, ub, lb, obj_fun!")
   }
@@ -39,7 +40,7 @@ FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL, bio
              S, ub, lb, obj_fun,
              react_name, met_name,
              bioMax, bioMean, bioMin,
-             gene_assoc  
+             gene_assoc, pFBAFlag
             )
   
   stopifnot(validObject(obj))
@@ -84,7 +85,8 @@ setMethod(f = "initialize",
                                 bioMax=-1,
                                 bioMean=-1,
                                 bioMin=-1,
-                                gene_assoc=NULL
+                                gene_assoc=NULL,
+                                pFBAFlag = -1
                                 ) 
           {
             # Campi già esistenti...
@@ -95,6 +97,7 @@ setMethod(f = "initialize",
             .Object@bioMax  <- bioMax
             .Object@bioMean <- bioMean
             .Object@bioMin  <- bioMin
+            .Object@pFBAFlag  <- pFBAFlag
 
             ncol <- ncol(.Object@S)
             nrow <- nrow(.Object@S)
@@ -396,6 +399,7 @@ setMethod(f="writeFBAfile",
     bioMean   <- theObject@bioMean
     bioMin    <- theObject@bioMin
     gen_assoc <- theObject@gene_assoc
+    pFBAFlag    <- theObject@pFBAFlag
     
     # Dichiariamo la variabile model_name (così come serve nel C++):
     model_name <- fba_fname  # se vuoi che il file si chiami come fba_fname
@@ -417,16 +421,18 @@ setMethod(f="writeFBAfile",
       uppbnd     = uppbnd,
       rb         = rb,
       gene_assoc = gen_assoc,
-      model_name = model_name,  # <--- passiamo la stringa
+      model_name = model_name,  
       write      = write,
       wd         = dest_dir,
       bioMax     = bioMax,
       bioMean    = bioMean,
-      bioMin     = bioMin
+      bioMin     = bioMin,
+      pFBAFlag   = pFBAFlag
     )
   }
 )
 
+# Biomass Options
 
 setGeneric("setBiomassParameters", function(object, bioMax, bioMean, bioMin) standardGeneric("setBiomassParameters"))
 
@@ -437,3 +443,10 @@ setMethod("setBiomassParameters", signature = "FBA_greatmod", definition = funct
   return(object)
 })
 
+# pFBA Options 
+setGeneric("setPFbaGeneOption", function(object, geneOption) standardGeneric("setPFbaGeneOption"))
+
+setMethod("setPFbaGeneOption", signature = "FBA_greatmod", definition = function(object, geneOption) {
+  object@pFBAFlag <- geneOption
+  return(object)
+})

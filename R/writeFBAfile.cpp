@@ -57,7 +57,8 @@ void writeModelCpp(NumericMatrix S,
                    string wd,
                    double bioMax = -1,
                    double bioMean = -1,
-                   double bioMin = -1)
+                   double bioMin = -1,
+                   int pFBAFlag  = -1)
 {
     if (!write) {
       Rcout << "Skipping file writing (write=false)" << std::endl;
@@ -93,7 +94,8 @@ void writeModelCpp(NumericMatrix S,
     buffer << "\n";
 
     // 3) Dimensioni e tipo di problema
-    buffer << nrow << " ; " << ncol << " ; GLP_MAX\n";
+    buffer << nrow << " ; " << ncol << " ; GLP_MAX" << " ; " << pFBAFlag << "\n";
+    
 
     // 4) Prepariamo i dati della matrice S (solo i non-zero)
     int nnz = 0;
