@@ -35,16 +35,16 @@ FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL, bio
   if (missing(S) || missing(ub) || missing(lb) || missing(obj_fun) ) {
     stop("Creating an object of class model needs: S, ub, lb, obj_fun!")
   }
-  
+
   obj <- new("FBA_greatmod",
              S, ub, lb, obj_fun,
              react_name, met_name,
              bioMax, bioMean, bioMin,
              gene_assoc, pFBAFlag
             )
-  
+
   stopifnot(validObject(obj))
-  
+
   return(obj)
 }
 
@@ -53,20 +53,20 @@ validityGreatModClass=function(object)
 {
   if(!is.matrix(object@S))
     return("S has to be a matrix with: 1) number of rows equal to number of metabolites, and 2) number of columns equal to the number of reactions.")
-  
+
   ncol = length(object@S[1,])
   nrow = length(object@S[, 1])
-  
+
   if(length(object@obj_coef)!=ncol || length(object@uppbnd)!=ncol || length(object@lowbnd)!=ncol || length(object@react_id)!=ncol){
     return("The obj_fun, ub, and lb have different lengths. The number of rections should be equal to the number of columns of S.")
   }
-  
+
   if(length(unique(object@react_id)) != ncol)
     return("The vector of reactions name is different from the number of columns of S, or multiple reactions have the same name (it is not allowed)!")
-  
+
   if(length(unique(object@met_id))!= nrow)
     return("The vector of metabolites name is different from the number of rows of S, or multiple metabolites have the same name (it is not allowed)!")
-  
+
   return(TRUE)
 }
 
@@ -87,7 +87,7 @@ setMethod(f = "initialize",
                                 bioMin=-1,
                                 gene_assoc=NULL,
                                 pFBAFlag = -1
-                                ) 
+                                )
           {
             # Campi già esistenti...
             .Object@S       <- as.matrix(S)
@@ -147,16 +147,16 @@ setMethod(f="setObjFun",
           {
             if(is.null(theObject@react_id))
               return("No reactions name are present in the class.")
-            
+
             id = which(theObject@react_id %in% reaction_name)
-            
+
             if(length(id) == 0)
               return("The reactions passed in input are not present in the model.")
-            
+
             obj_coef = rep(0,length(theObject@obj_coef))
             obj_coef[id] = 1
             theObject@obj_coef = obj_coef
-            
+
             return(theObject)
           }
 )
@@ -179,19 +179,19 @@ setMethod(f="getExchangesR",
           signature=c("FBA_greatmod"),
           definition=function(theObject)
           {
-            
+
             S = theObject@S
             mat_nonzero <- as.data.frame(which(S != 0, arr.ind = T) ) %>%
               dplyr::group_by(col) %>%
               dplyr::filter(length(col) == 1) %>%
               dplyr::ungroup() %>%
               dplyr::select(col)
-            
+
             if(length(mat_nonzero$col) == 0)
               stop("No exchange reaction was found!")
             else
               ExcR = theObject@react_id[mat_nonzero$col]
-            
+
             return(ExcR)
           }
 )
@@ -217,10 +217,10 @@ setMethod(f="getConstraints",
             index.r = which(theObject@react_id == reaction.name)
             if(length(index.r)==0)
               stop("The reaction does not match any reaction name in the model.")
-            
+
             Constraints = c(theObject@lowbnd[index.r],
                             theObject@uppbnd[index.r])
-            
+
             return(Constraints)
           }
 )
@@ -248,13 +248,13 @@ setMethod(f="setConstraints",
             index.r = which(theObject@react_id == reaction.name)
             if(length(index.r)==0)
               stop("The reaction does not match any reaction name in the model.")
-            
+
             if(length(unique(newConstraints)) !=2 )
               stop("The parameter newConstraints must be a vector of two different numeric value (the minimum one will be the new lwbnd, the maximum the uppbnd)  ")
-            
+
             theObject@uppbnd[index.r] = max(newConstraints)
             theObject@lowbnd[index.r] = min(newConstraints)
-            
+
             return(theObject)
           }
 )
@@ -303,12 +303,12 @@ setMethod(f="setDiet",
             {
               return("dietf should be a data.frame with three columns: 1) reactions name, 2) lwbnd and 3) uppbwnd.")
             }
-            
+
             colnames(diet) = c("reactionID","bnd1","bnd2")
-            
+
             theObject@dietValues = diet
             reactionComm = diet$reactionID[diet$reactionID %in% model@react_id]
-            
+
             if(length(reactionComm) == 0)
             {
               stop("No reactions in the diet is shared with the ractions name in the FBA model.")
@@ -318,19 +318,19 @@ setMethod(f="setDiet",
               bnd_index = match(reactionComm, theObject@react_id )
               theObject@lowbnd_beforeDiet = theObject@lowbnd
               theObject@uppbnd_beforeDiet = theObject@uppbnd
-              
+
               for(b in 1:length(reactionComm))
               {
                 bnds = diet[diet$reactionID == reactionComm[b],-1]
                 theObject@lowbnd[bnd_index[b]] = min(bnds)
                 theObject@uppbnd[bnd_index[b]] = max(bnds)
               }
-              
+
               NotComm = diet$reactionID[! diet$reactionID %in% theObject@react_id]
               if(length(NotComm) > 0 )
                 print(paste0( length(NotComm), " reactions of ",length(diet$reactionID)," are not present in the FBA model") )
             }
-            
+
             return(theObject)
           }
 )
@@ -361,9 +361,6 @@ setMethod(f="setDiet.name",
 )
 
 
-library(Rcpp)
-sourceCpp(paste0(wd, "/epimod_FBAfunctions/R/", "writeFBAfile.cpp")) 
-
 #' @description Write the fba model in file.
 #' @name FBA_greatmod-methods
 #' @aliases writeFBAfile FBA_greatmod-methods
@@ -372,6 +369,7 @@ sourceCpp(paste0(wd, "/epimod_FBAfunctions/R/", "writeFBAfile.cpp"))
 #' @docType methods
 #' @rdname FBA_greatmod-methods
 #' @export
+#' @import Rcpp
 #'
 setGeneric(name="writeFBAfile",
            def=function(theObject,fba_fname,dest_dir,...)
@@ -388,7 +386,7 @@ setMethod(f="writeFBAfile",
     if (is.null(fba_fname)) {
       fba_fname <- "fba_file.txt"
     }
-    
+
     # Usa theObject invece di model
     S         <- as.matrix(theObject@S)
     react_id  <- unlist(theObject@react_id)
@@ -400,18 +398,19 @@ setMethod(f="writeFBAfile",
     bioMin    <- theObject@bioMin
     gen_assoc <- theObject@gene_assoc
     pFBAFlag    <- theObject@pFBAFlag
-    
+
     # Dichiariamo la variabile model_name (così come serve nel C++):
     model_name <- fba_fname  # se vuoi che il file si chiami come fba_fname
     write <- TRUE
 
     ncol <- ncol(S)
     nrow <- nrow(S)
-    
+
     # Creiamo la matrice rb di vincoli
     b <- matrix(0, nrow = ncol, ncol = 1)
     rb <- cbind(b,b)
-    
+
+    Rcpp::sourceCpp(system.file("AuxiliarFunctions/writeFBAfile.cpp", package = "epimodFBAfunctions"))
     # Chiamata alla funzione C++:
     writeModelCpp(
       S          = S,
@@ -421,7 +420,7 @@ setMethod(f="writeFBAfile",
       uppbnd     = uppbnd,
       rb         = rb,
       gene_assoc = gen_assoc,
-      model_name = model_name,  
+      model_name = model_name,
       write      = write,
       wd         = dest_dir,
       bioMax     = bioMax,
@@ -443,7 +442,7 @@ setMethod("setBiomassParameters", signature = "FBA_greatmod", definition = funct
   return(object)
 })
 
-# pFBA Options 
+# pFBA Options
 setGeneric("setPFbaGeneOption", function(object, geneOption) standardGeneric("setPFbaGeneOption"))
 
 setMethod("setPFbaGeneOption", signature = "FBA_greatmod", definition = function(object, geneOption) {

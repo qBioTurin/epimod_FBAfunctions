@@ -21,7 +21,7 @@ setDiet(theObject, dietf)
 
 setDiet.name(theObject, diet_name)
 
-writeFBAfile(theObject, fba_fname, ...)
+writeFBAfile(theObject, fba_fname, dest_dir, ...)
 }
 \arguments{
 \item{theObject}{A \code{FBA_greatmod} object}
