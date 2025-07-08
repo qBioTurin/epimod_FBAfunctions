@@ -1,7 +1,25 @@
-
-#------------------------------------------------------------------------------#
-#                       FBA_greatmod class definition                          #
-#------------------------------------------------------------------------------#
+#' An S4 Class for Flux Balance Analysis Models
+#'
+#' The `FBA_greatmod` class stores all relevant information to perform Flux Balance Analysis,
+#' including stoichiometric matrix, reaction bounds, objective coefficients, and annotations.
+#' @rdname FBA_greatmod-class
+#' @slot S Numeric matrix. Stoichiometric matrix (metabolites × reactions).
+#' @slot lowbnd Numeric vector. Lower bounds of reactions.
+#' @slot uppbnd Numeric vector. Upper bounds of reactions.
+#' @slot obj_coef Numeric vector. Objective function coefficients.
+#' @slot react_id Character vector. Reaction identifiers.
+#' @slot met_id Character vector. Metabolite identifiers.
+#' @slot dietName Character string. Name of the diet used in simulations.
+#' @slot dietValues Data frame. Contains dietary constraint values.
+#' @slot lowbnd_beforeDiet Numeric vector. Lower bounds before dietary constraints.
+#' @slot uppbnd_beforeDiet Numeric vector. Upper bounds before dietary constraints.
+#' @slot bioMax Numeric. Maximum biomass yield (optional).
+#' @slot bioMean Numeric. Mean biomass yield (optional).
+#' @slot bioMin Numeric. Minimum biomass yield (optional).
+#' @slot gene_assoc Numeric vector. Gene associations per reaction.
+#' @slot pFBAFlag Numeric. Flag to indicate parsimonious FBA configuration.
+#'
+#' @export
 
 setClass(
   # Set the name for the class
@@ -27,9 +45,14 @@ setClass(
   )
 )
 
-#------------------------------------------------------------------------------#
-#                              user constructor                                #
-#------------------------------------------------------------------------------#
+#' Create an FBA_greatmod Object
+#'
+#' Constructs a new object of the `FBA_greatmod` S4 class using model inputs.
+#'
+#' @inheritParams FBA_greatmod-class
+#'
+#' @return An object of class `FBA_greatmod`
+#' @export
 
 FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL, bioMax = -1, bioMean = -1, bioMin = -1, gene_assoc = NULL, pFBAFlag = -1) {
   if (missing(S) || missing(ub) || missing(lb) || missing(obj_fun) ) {
@@ -48,7 +71,29 @@ FBA_greatmod <- function(S, ub, lb, obj_fun, react_name=NULL, met_name=NULL, bio
   return(obj)
 }
 
-## assign the function as the validity method for the class
+#' Methods for Manipulating FBA_greatmod Objects
+#'
+#' A collection of methods to inspect, modify, and export models defined by the S4 class `FBA_greatmod`.
+#' These include functions for adjusting constraints, setting dietary inputs, managing biomass parameters,
+#' defining objective functions, extracting exchange reactions, and writing the model to external formats.
+#'
+#' @seealso \code{\link{FBA_greatmod}} for the class definition, \code{\link{showFBAmethods}} for the list of the methods.
+#'
+#' @rdname FBA_greatmod-methods
+#' @docType methods
+#' @return showFBAmethods returns a character vector of method names used for FBA_greatmod objects
+#' @aliases showFBAmethods, FBA_greatmod-method
+#' @export
+
+showFBAmethods <- function() {
+  return(c(
+    "setObjFun", "getExchangesR", "getConstraints", "setConstraints",
+    "setDiet", "setDiet.name", "writeFBAfile", "setBiomassParameters",
+    "setPFbaGeneOption"
+  ))
+}
+
+
 validityGreatModClass=function(object)
 {
   if(!is.matrix(object@S))
@@ -72,10 +117,6 @@ validityGreatModClass=function(object)
 
 setValidity("FBA_greatmod", validityGreatModClass)
 
-##
-#------------------------------------------------------------------------------#
-#                            default constructor                               #
-#------------------------------------------------------------------------------#
 
 setMethod(f = "initialize",
           signature("FBA_greatmod"),
@@ -131,9 +172,20 @@ setMethod(f = "initialize",
 )
 
 
+#' Set Objective Function for FBA Model
+#'
+#' This method assigns the objective coefficients based on the specified reaction names.
+#'
+#' @aliases setObjFun,FBA_greatmod-method
+#' @param theObject An object of class `FBA_greatmod`
+#' @param reaction_name A character vector of reaction names to set as objective
+#' @return setObjFun returns the updated `FBA_greatmod` object with modified objective coefficients
+#' @export
+#' @examples
+#' \dontrun{
+#' model <- setObjFun(model, reaction_name = "EX_glc__D_e")
+#' }
 
-
-# create a method to change the objective function
 setGeneric(name="setObjFun",
            def=function(theObject,reaction_name)
            {
@@ -161,12 +213,17 @@ setMethod(f="setObjFun",
           }
 )
 
-#' @aliases getExchangesR FBA_greatmod-methods
-#' @param theObject A `FBA_greatmod` object
-#' @docType methods
+#' Identify Exchange Reactions
+#'
+#' getExchangesR returns the list of exchange reactions, i.e., reactions involving only one metabolite,
+#' which are typically used for input/output in FBA models.
+#'
+#' @param theObject An object of class `FBA_greatmod`
+#' @return A character vector of reaction IDs classified as exchange reactions.
 #' @rdname FBA_greatmod-methods
-#' @return The constraints of the reaction.
+#' @aliases getExchangesR,FBA_greatmod-method
 #' @export
+
 
 setGeneric(name="getExchangesR",
            def=function(theObject,reaction.name)
@@ -196,12 +253,17 @@ setMethod(f="getExchangesR",
           }
 )
 
-#' @aliases getConstraints FBA_greatmod-methods
-#' @param theObject A `FBA_greatmod` object
-#' @docType methods
+#' Get Constraints for a Specific Reaction
+#'
+#' Retrieves the lower and upper bounds for a given reaction name in the model.
+#'
+#' @param theObject An object of class `FBA_greatmod`
+#' @param reaction.name A character string identifying the reaction
+#' @return A numeric vector of length 2 containing the lower and upper bounds
 #' @rdname FBA_greatmod-methods
-#' @return The constraints of the reaction.
+#' @aliases getConstraints,FBA_greatmod-method
 #' @export
+
 
 setGeneric(name="getConstraints",
            def=function(theObject,reaction.name)
@@ -225,14 +287,18 @@ setMethod(f="getConstraints",
           }
 )
 
-#' @aliases setConstraints FBA_greatmod-methods
-#' @param theObject A `FBA_greatmod` object
-#' @param reaction.name Character of the reaction name.
-#' @param newConstraints Numeric vector of length equal to 2 containing the new lower and upper constraints
-#' @docType methods
+#' Set New Constraints for a Specific Reaction
+#'
+#' Updates the lower and upper bounds for a given reaction in the FBA model.
+#'
+#' @param theObject An object of class `FBA_greatmod`
+#' @param reaction.name A character string identifying the reaction to modify
+#' @param newConstraints Numeric vector of length 2 with the new bounds (lower, upper)
+#' @return The modified object of class `FBA_greatmod`
 #' @rdname FBA_greatmod-methods
-#' @return The FBA_greatmod class with the the constraints updated.
+#' @aliases setConstraints,FBA_greatmod-method
 #' @export
+
 
 setGeneric(name="setConstraints",
            def=function(theObject,reaction.name,newConstraints)
@@ -259,17 +325,16 @@ setMethod(f="setConstraints",
           }
 )
 
-#' @title FBA_greatmod methods.
+#' Apply Dietary Constraints to FBA Model
 #'
-#' @name FBA_greatmod-methods
-#' @aliases setDiet FBA_greatmod-methods
+#' Updates the reaction bounds in an FBA model based on a provided dietary file or data frame.
+#'
 #' @param theObject A `FBA_greatmod` object
-#' @param dietf The diet file or data.frame
-#' @docType methods
+#' @param dietf Path to a tab-delimited diet file or a data.frame with three columns: reaction ID, lower bound, upper bound.
+#' @return A modified `FBA_greatmod` object with updated reaction constraints and recorded diet metadata.
 #' @rdname FBA_greatmod-methods
-#' @return The FBA_greatmod class with lower bounds updated with diet values.
+#' @aliases setDiet,FBA_greatmod-method
 #' @export
-#'
 setGeneric(name="setDiet",
            def=function(theObject,dietf)
            {
@@ -335,14 +400,17 @@ setMethod(f="setDiet",
           }
 )
 
-
-#' @aliases setDiet.name FBA_greatmod-methods
+#' Manually Set the Diet Name in an FBA Model
+#'
+#' Updates the internal slot \code{dietName} with a user-defined label.
+#'
 #' @param theObject A `FBA_greatmod` object
-#' @param diet_name Character for the diet name
-#' @docType methods
+#' @param diet_name A character string representing the diet name
+#' @return A modified `FBA_greatmod` object
 #' @rdname FBA_greatmod-methods
-#' @return The FBA_greatmod class with the diet name updated.
+#' @aliases setDiet.name,FBA_greatmod-method
 #' @export
+
 
 setGeneric(name="setDiet.name",
            def=function(theObject,diet_name)
@@ -361,16 +429,19 @@ setMethod(f="setDiet.name",
 )
 
 
-#' @description Write the fba model in file.
-#' @name FBA_greatmod-methods
-#' @aliases writeFBAfile FBA_greatmod-methods
+#' Write FBA Model to File
+#'
+#' Exports the model data to a text file for use with external tools or simulators. Delegates to a compiled C++ function.
+#'
 #' @param theObject A `FBA_greatmod` object
-#' @param fba_fname The file name in which the FBA model will be saved. See *epimod::model.generation*.
-#' @docType methods
+#' @param fba_fname Filename to save the model (default = "fba_file.txt")
+#' @param dest_dir Destination directory for output file
+#' @param ... Additional arguments passed to C++ backend
 #' @rdname FBA_greatmod-methods
+#' @aliases writeFBAfile,FBA_greatmod-method
 #' @export
 #' @import Rcpp
-#'
+
 setGeneric(name="writeFBAfile",
            def=function(theObject,fba_fname,dest_dir,...)
            {
@@ -431,7 +502,19 @@ setMethod(f="writeFBAfile",
   }
 )
 
-# Biomass Options
+#' Set Biomass Summary Values
+#'
+#' Assigns values for biomass max, mean, and min slots used in model tracking or export.
+#'
+#' @param object A `FBA_greatmod` object
+#' @param bioMax Numeric value for maximum biomass
+#' @param bioMean Numeric value for mean biomass
+#' @param bioMin Numeric value for minimum biomass
+#' @return Modified `FBA_greatmod` object
+#' @rdname FBA_greatmod-methods
+#' @aliases setBiomassParameters,FBA_greatmod-method
+#' @export
+
 
 setGeneric("setBiomassParameters", function(object, bioMax, bioMean, bioMin) standardGeneric("setBiomassParameters"))
 
@@ -442,7 +525,17 @@ setMethod("setBiomassParameters", signature = "FBA_greatmod", definition = funct
   return(object)
 })
 
-# pFBA Options
+#' Set Gene Option for Parsimonious FBA (pFBA)
+#'
+#' Updates the \code{pFBAFlag} slot in the model, controlling how gene associations are handled in downstream pFBA analysis.
+#'
+#' @param object A `FBA_greatmod` object
+#' @param geneOption A numeric flag for pFBA configuration
+#' @return Modified `FBA_greatmod` object
+#' @rdname FBA_greatmod-methods
+#' @aliases setPFbaGeneOption,FBA_greatmod-method
+#' @export
+
 setGeneric("setPFbaGeneOption", function(object, geneOption) standardGeneric("setPFbaGeneOption"))
 
 setMethod("setPFbaGeneOption", signature = "FBA_greatmod", definition = function(object, geneOption) {
