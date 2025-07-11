@@ -114,7 +114,9 @@ process_boundary_reactions <- function(
 # ------------------------------------------------------------------
 # Master function to set bounds using metadata and projection
 # ------------------------------------------------------------------
-
+#' 
+#' @export
+#' 
 run_full_ex_bounds <- function(
     hypernode_name,
     biounit_models,
