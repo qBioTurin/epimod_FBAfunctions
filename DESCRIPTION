@@ -16,17 +16,33 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Imports:
-     Rcpp (>= 1.0.0),
-     R.matlab,
-     stringr,
-     dplyr,
-     tidyr,
-     sensobol,
-     magrittr,
-     readr,
-     methods
+    Rcpp (>= 1.0.0),
+    R.matlab,
+    dplyr,
+    ggplot2,
+    stringr,
+    purrr,
+    jsonlite,
+    tidyr,
+    patchwork,
+    scales,
+    fdatest,
+    xml2,
+    yaml,
+    rlang,
+    parallel,
+    foreach,
+    doParallel,
+    glue,
+    readr,
+    sensobol,
+    magrittr,
+    methods
 LinkingTo: 
     Rcpp
 SystemRequirements: C++11
 Suggested:
-	 testthat (>= 3.0.0)
+    devtools,
+    pkgload,
+    usethis,
+    testthat (>= 3.0.0)

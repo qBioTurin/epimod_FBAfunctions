@@ -44,7 +44,7 @@ To install **epimod_FBAfunctions** you can use use **devtools**:
 ```
 install.packages("devtools")
 library(devtools)
-install_github("https://github.com/qBioTurin/epimod_FBAfunctions", ref="unified-epimod_FBAfunctions")
+install_github("https://github.com/qBioTurin/epimod_FBAfunctions", ref="master")
 ```
 
 ## Repositories
