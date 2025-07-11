@@ -25,6 +25,8 @@ Imports:
     jsonlite,
     purrr,
     tidyr,
+    tibble,
+    readr,
     patchwork,
     scales,
     fdatest,

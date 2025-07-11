@@ -1,3 +1,7 @@
+#' @importFrom purrr map_chr map map_lgl walk2 set_names
+#' @importFrom tidyr unnest pivot_longer
+#' @importFrom tibble tibble
+#' @importFrom readr read_csv write_csv write_lines
 #' 
 #' @export
 #' 
