@@ -460,6 +460,7 @@ setMethod(f="writeFBAfile",
     writeModelCpp(
       S          = S,
       react_id   = react_id,
+      met_id     = theObject@met_id,  
       obj_coef   = obj_coef,
       lowbnd     = lowbnd,
       uppbnd     = uppbnd,

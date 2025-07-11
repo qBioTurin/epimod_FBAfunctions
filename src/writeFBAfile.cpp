@@ -90,11 +90,11 @@ void writeModelCpp(NumericMatrix S,
     
 
     // 2) Scriviamo i nomi dei metaboliti (unica riga, spazio-separati)
-    for (int i = 0; i < met_id.size(); i++) {
+    /*for (int i = 0; i < met_id.size(); i++) {
         buffer << as<std::string>(met_id[i]);
         if (i < met_id.size() - 1) buffer << " ";
     }
-    buffer << "\n";
+    buffer << "\n";*/
 
     // 3) Scriviamo la riga con gene_assoc (unica riga, spazio-separati)
     for (int i = 0; i < gene_assoc.size(); i++) {
