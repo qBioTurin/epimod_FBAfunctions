@@ -20,6 +20,9 @@ derive_abbrs <- function(model_name) {
   unique(tolower(abbrs))
 }
 
+#' 
+#' @export
+#' 
 # Build a general-purpose list of FBA-compatible biounits
 make_biounit_models <- function(model_names,
                                 biomass_params,
@@ -45,6 +48,9 @@ make_biounit_models <- function(model_names,
   })
 }
 
+#' 
+#' @export
+#' 
 # Write population dynamics parameters (e.g., starvation, duplication, death)
 write_population_params <- function(biounit_models, path) {
   # Turn each population_settings list into a 1×3 data.frame
