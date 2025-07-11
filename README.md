@@ -17,7 +17,6 @@ the system dynamics. Using **epimod_FBAfunctions**, gene expression data and die
 2. **FBAgreatmodeClass** generates the FBA_greatmod class in which all the elements needed for defining the FBA model to pass to GreatMod are saved. It takes in input a Matlab file
 3. **readMat** Reads matlab model and imports matlab cobra (ONLY) models into the R environment
 4. **FBA4Greatmod.generation** generates the *FBA_greatmod* class in which all the elements needed for defining the FBA model to pass to GreatMod are saved. It takes in input a Matlab file.
-5. **writeFBAfile.cpp**: Provides a C++ implementation (via Rcpp integration) for rapidly writing the FBA model data into a GLPK-compatible file format.
 
 ## FBA_greatmod class methods
 
@@ -28,7 +27,6 @@ the system dynamics. Using **epimod_FBAfunctions**, gene expression data and die
 - **writeFBAfile** writes the FBA model's details to a file suitable for GLPK solver input.
 - **setDiet** updates the dietary constraints in an FBA model based on input from a file or data frame.
 - **setConstraints**  updates the flux constraints for a specific reaction in an FBA model.
-- **setBiomassParameters** sets three optional parameters (bioMax, bioMean, bioMin) representing the maximum, typical, and minimum bacterial biomass levels, thereby enabling the normalization of fluxes according to biomass
 
 ## Global Sensitivity Analysis Functions
 
@@ -46,8 +44,7 @@ To install **epimod_FBAfunctions** you can use use **devtools**:
 ```
 install.packages("devtools")
 library(devtools)
-install_github("https://github.com/qBioTurin/epimod_FBAfunctions", ref="main")
-install.packages("Rcpp")
+install_github("https://github.com/qBioTurin/epimod_FBAfunctions", ref="unified-epimod_FBAfunctions")
 ```
 
 ## Repositories

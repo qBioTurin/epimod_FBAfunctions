@@ -1,10 +1,8 @@
 library(epimodFBAfunctions)
-library(readr)
-library(dplyr)
 
 ### Data files
-fba_mat_file <- system.file("MATmodels", "Ec_core.mat", package = "epimodFBAfunctions")
-diet_file <- system.file("diets/vmh", "EU_average.tsv", package = "epimodFBAfunctions")
+fba_mat_file <- system.file("data/MATmodels", "Ec_core.mat", package = "epimodFBAfunctions")
+diet_file <- system.file("data/diets/vmh", "EU_average.tsv", package = "epimodFBAfunctions")
 
 ### Model
 model = FBA4Greatmod.generation(fba_mat = fba_mat_file)
@@ -25,4 +23,4 @@ model = setDiet.name(model,diet_name = "EU_average")
 for(r in model@react_id) model = setConstraints(model, reaction.name = r, newConstraints = c(-0.1, 10))
 
 saveRDS(model, "./Ec_core.RDs")
-writeFBAfile(theObject = model,fba_fname =  "./Ec_core",dest_dir = ".")
+writeFBAfile(model, "./Ec_core")

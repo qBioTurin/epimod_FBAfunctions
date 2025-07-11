@@ -1,18 +1,32 @@
 Package: epimodFBAfunctions
 Type: Package
-Title: Supporting epimod for the integration of FBA models. 
+Title: Supporting epimod for the integration of FBA models
 Version: 1.0
 Authors@R: 
     c(person("Simone", "Pernice", , "simone.pernice@unito.it", role = c("cre","aut"),
            comment = c(ORCID = "YOUR-ORCID-ID")),
       person("Riccardo", "Aucello", , "riccardo.aucello@unito.it", role = c("aut"),
            comment = c(ORCID = "YOUR-ORCID-ID")),
-    person("Francesca", "Cordero", , "fcordero@unito.it", role = c("aut"),
+      person("Francesca", "Cordero", , "fcordero@unito.it", role = c("aut"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
-           )
+    )
 Description: Supporting epimod for the integration of FBA models.
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a license
+License: GPL-3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
-Imports: R.matlab, stringr
+Imports:
+     Rcpp (>= 1.0.0),
+     R.matlab,
+     stringr,
+     dplyr,
+     tidyr,
+     sensobol,
+     magrittr,
+     readr,
+     methods
+LinkingTo: 
+    Rcpp
+SystemRequirements: C++11
+Suggested:
+	 testthat (>= 3.0.0)

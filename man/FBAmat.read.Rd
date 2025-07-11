@@ -4,7 +4,7 @@
 \alias{FBAmat.read}
 \title{Read matlab model}
 \usage{
-FBAmat.read(fba_mat)
+FBAmat.read(fba_mat, input_dir)
 }
 \arguments{
 \item{fba_mat}{Full path to matlab model file}
@@ -14,7 +14,4 @@ The generic function \code{readMATmod} imports matlab cobra (ONLY) models into .
 }
 \details{
 Returns ...
-}
-\author{
-Aucello Riccardo, Beccuti Marco, Cordero Francesca, Pernice Simone
 }

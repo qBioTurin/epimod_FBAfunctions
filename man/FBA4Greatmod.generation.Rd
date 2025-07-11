@@ -11,7 +11,8 @@ FBA4Greatmod.generation(
   ub = NULL,
   lb = NULL,
   obj_fun = NULL,
-  react_name = NULL
+  react_name = NULL,
+  input_dir
 )
 }
 \arguments{
@@ -41,7 +42,4 @@ With this function the file to pass to the GLPKsolver is generated:
 m rows)   definition of the S row bounds (i.e. b)
 n rows)   definition of the x bounds
 m}n rows) definition of the S coeffs: row_index col_index value
-}
-\author{
-Aucello Riccardo, Beccuti Marco, Cordero Francesca, Pernice Simone
 }
