@@ -72,9 +72,16 @@ project_boundary_reactions <- function(biounit_models,
       write_lines(.x, file.path(out_dir, sprintf("exclusive_reactions_%s.txt", .y)))
   )
   
-  bounds_tbl <- shared_rxns_df %>%
+  	bounds_tbl <- shared_rxns_df %>%
     dplyr::select(reaction, organism = abbr, lower_bound = lowbnd, upper_bound = uppbnd) %>%
     dplyr::distinct()
+    
+   bounds_tbl <- bounds_tbl %>% 
+			mutate(
+				lower_bound = as.numeric(unlist(lower_bound)),
+				upper_bound = as.numeric(unlist(upper_bound))
+  	)
+
   
   write_csv(bounds_tbl, file.path(out_dir, "reaction_bounds.csv"))
   
