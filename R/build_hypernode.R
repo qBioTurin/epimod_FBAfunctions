@@ -39,7 +39,7 @@
 #' @export
 build_hypernode <- function(hypernode_name,
                             config_yaml,
-                            pnpro_template = "blank.PNPRO",
+                        		boundary_conditions_file,
                             mat_dir        = "models",
                             base_dir       = getwd(),
                             overwrite      = FALSE,
@@ -49,12 +49,13 @@ build_hypernode <- function(hypernode_name,
 
   # 0)  Resolve PNPRO template ----------------------------------------
   if (!fs::file_exists(pnpro_template)) {
-    # File name only? look up in inst/extdata/
-    pnpro_template <- system.file("extdata", pnpro_template,
+    pnpro_template <- system.file("extdata", "blank.PNPRO",
                                   package = "epimodFBAfunctions")
   }
+  
   if (pnpro_template == "")
     stop("PNPRO template not found: ", pnpro_template)
+    
   pnpro_template <- abs_path(pnpro_template)
 
   tmpl_cpp <- system.file("templates", "general_functions_template.cpp",
@@ -66,8 +67,9 @@ build_hypernode <- function(hypernode_name,
   hyper_root <- fs::path(base_dir, "hypernodes", hypernode_name)
   if (fs::dir_exists(hyper_root) && !overwrite)
     stop("Run already exists, set overwrite = TRUE: ", hyper_root)
-  fs::dir_delete(hyper_root, recurse = TRUE) # safely wipe if overwrite
-  fs::dir_create(hyper_root, recurse = TRUE)
+	if (fs::dir_exists(hyper_root))
+		fs::dir_delete(hyper_root)
+  fs::dir_create(hyper_root)
 
   paths <- list(
     config = fs::path(hyper_root, "config"),
@@ -76,7 +78,7 @@ build_hypernode <- function(hypernode_name,
     biounit= fs::path(hyper_root, "biounits"),
     gen    = fs::path(hyper_root, "gen")
   )
-  purrr::walk(paths, fs::dir_create, recurse = TRUE)
+  purrr::walk(paths, fs::dir_create, recursive = TRUE)
 
   # local petri_nets_library (mirrors old script)
   petri_lib <- fs::path(base_dir, "petri_nets_library")

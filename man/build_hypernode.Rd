@@ -7,7 +7,7 @@
 build_hypernode(
   hypernode_name,
   config_yaml,
-  pnpro_template = "blank.PNPRO",
+  boundary_conditions_file,
   mat_dir = "models",
   base_dir = getwd(),
   overwrite = FALSE,
@@ -19,9 +19,6 @@ build_hypernode(
 
 \item{config_yaml}{Path to the YAML file.}
 
-\item{pnpro_template}{Path to a PNPRO skeleton.  If just a filename it
-is searched in the package’s \verb{extdata/} folder.}
-
 \item{mat_dir}{Folder containing user \emph{.mat} files (default "models").}
 
 \item{base_dir}{Root working directory (default = \code{getwd()}).}
@@ -30,6 +27,9 @@ is searched in the package’s \verb{extdata/} folder.}
 name before rebuilding (FALSE).}
 
 \item{debug}{Passed to \code{epimod::model.analysis()}.}
+
+\item{pnpro_template}{Path to a PNPRO skeleton.  If just a filename it
+is searched in the package’s \verb{extdata/} folder.}
 }
 \value{
 (Invisibly) a list of created sub‑paths.
