@@ -74,7 +74,7 @@ process_model <- function(m,
 	## -----------------------------------------------------------------
 	##  write the FBA text file  (exactly one “.txt”)
 	## -----------------------------------------------------------------
-	fba_base    <- paste0(abbr, "_model")                 # no extension
+	fba_base    <- paste0(abbr, "_model")                 # “ecs_model”
 	output_file <- fs::path(input_dir, paste0(fba_base, ".txt"))
 
 	cat("📝 Writing model with writeFBAfile() …\n")
@@ -82,7 +82,7 @@ process_model <- function(m,
 	writeFBAfile(
 		model_obj,
 		fba_fname = fba_base,
-		dest_dir  = fs::path(input_dir, "")   # <-- ensures trailing “/”
+		dest_dir  = paste0(input_dir, .Platform$file.sep)   # ← ensures “…/”
 	)
 
 
