@@ -183,32 +183,6 @@ build_hypernode <- function(hypernode_name,
 		fs::path(paths$src, paste0("functions_", hypernode_name, ".R"))
 	)
 
-
-  # 8) epimod model generation + analysis -----------------------------
-  fba_files <- vapply(biounit_models, function(m)
-    fs::path(hyper_root, "biounits", m$FBAmodel, m$txt_file), character(1))
-
-  epimod::model.generation(net_fname = repaired_pn,
-                           transitions_fname = fs::path(paths$src, paste0("general_functions_", hypernode_name, ".cpp")),
-                           fba_fname = fba_files)
-
-  fs::dir_create(paths$gen)
-  purrr::walk(c(".solver", ".def", ".fbainfo", ".net", ".PlaceTransition"), function(ext) {
-    src <- fs::path(base_dir, paste0(hypernode_name, ext))
-    if (fs::file_exists(src)) fs::file_move(src, paths$gen)
-  })
-  
-
-  epimod::model.analysis(solver_fname     = fs::path(paths$gen, paste0(hypernode_name, ".solver")),
-                         parameters_fname = fs::path(paths$config, fs::path_file("initial_data.csv")),
-                         functions_fname  = fs::path(paths$src, paste0("functions_", hypernode_name, ".R")),
-                         debug = debug, i_time = 0, f_time = 10, s_time = 1, atol = 1e-6, rtol = 1e-6,
-                         fba_fname = fba_files,
-                         user_files = c(fs::path(paths$config, "population_parameters.csv"),
-                                        fs::path(paths$gen, paste0(hypernode_name, ".fbainfo")),
-                                        fs::path(paths$output, "ub_bounds_projected.csv"),
-                                        fs::path(paths$output, "ub_bounds_not_projected.csv")))
-
   invisible(paths)
 }
 # ---------------------------------------------------------------------
