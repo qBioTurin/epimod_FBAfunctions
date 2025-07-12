@@ -1,14 +1,16 @@
 #' Process a single biounit model
 #'
-#' Copies the chosen *.mat* file into the hyper-node workspace, converts
-#' it to a text FBA model, and returns the path to that *.txt*.
+#' * Copies the chosen *.mat* file into the hyper-node workspace  
+#' * Converts it to a text FBA model with `writeFBAfile()`  
+#' * Returns the path to that single *.txt* file
 #'
-#' @param m      A list for one cellular unit, as returned by
-#'               `make_biounit_models()`.
-#' @param hypernode_name Character.  Parent hyper-node label.
-#' @param mat_dir Folder that contains the user-supplied *.mat* files
-#'               (the same value you pass to `build_hypernode()`).
-#' @param base_dir Root working directory (default = `getwd()`).
+#' @param m              A list for one cellular unit (from
+#'                       `make_biounit_models()`).
+#' @param hypernode_name Character. Parent hyper-node label.
+#' @param mat_dir        Directory that contains the user-supplied
+#'                       *.mat* files (same value you pass to
+#'                       `build_hypernode()`).
+#' @param base_dir       Root working directory (default = `getwd()`).
 #'
 #' @return (Invisibly) a list with status and created paths.
 #' @export
@@ -20,7 +22,7 @@ process_model <- function(m,
   cat("\n========== PROCESSING BIOUNIT ==========\n")
 
   ## -----------------------------------------------------------------
-  ##  local helpers & metadata
+  ##  helpers & metadata
   ## -----------------------------------------------------------------
   abs_path <- function(...) fs::path_abs(fs::path(...))
 
@@ -36,7 +38,7 @@ process_model <- function(m,
     mat_path <- fs::path_abs(FBAmodel)
     FBAmodel <- tools::file_path_sans_ext(fs::path_file(mat_path))
   } else {
-    ## plain model name → look inside mat_dir/
+    ## plain name → look inside mat_dir/
     mat_candidate <- fs::path(mat_dir, paste0(FBAmodel, ".mat"))
     if (!fs::file_exists(mat_candidate))
       stop("MAT model not found: ", mat_candidate)
@@ -44,16 +46,14 @@ process_model <- function(m,
   }
 
   ## -----------------------------------------------------------------
-  ##  target folders inside the hyper-node
+  ##  workspace within the hyper-node
   ## -----------------------------------------------------------------
- input_dir <- abs_path(base_dir, "hypernodes", hypernode_name,
-                      "biounits", FBAmodel)
+  input_dir <- abs_path(base_dir, "hypernodes", hypernode_name,
+                        "biounits", FBAmodel)
   fs::dir_create(input_dir, recurse = TRUE)
 
-  output_file <- fs::path(input_dir, paste0(abbr, "_model.txt"))
-
   ## -----------------------------------------------------------------
-  ##  copy *.mat* and generate *.txt* model
+  ##  copy *.mat*  →  generate *.txt*
   ## -----------------------------------------------------------------
   fs::file_copy(mat_path,
                 fs::path(input_dir, paste0(FBAmodel, ".mat")),
@@ -71,23 +71,24 @@ process_model <- function(m,
     bioMin  = m$biomass$min
   )
 
+  ## -----------------------------------------------------------------
+  ##  write the FBA text file  (exactly one “.txt”)
+  ## -----------------------------------------------------------------
+  fba_base     <- paste0(abbr, "_model")                 # no extension
+  output_file  <- fs::path(input_dir, paste0(fba_base, ".txt"))
+
   cat("📝 Writing model with writeFBAfile() …\n")
-  before_files <- fs::dir_ls(fs::path_dir(input_dir),
-                             glob = "*.txt")
 
-  writeFBAfile(model_obj,
-               fba_fname = paste0(abbr, "_model.txt"),
-               dest_dir  = input_dir)
-
-  after_files <- fs::dir_ls(fs::path_dir(input_dir),
-                            glob = "*.txt")
-  new_txt     <- setdiff(after_files, before_files)
+  writeFBAfile(
+    model_obj,
+    fba_fname = fba_base,        # writeFBAfile() appends “.txt”
+    dest_dir  = input_dir
+  )
 
   ## -----------------------------------------------------------------
-  ##  final bookkeeping
+  ##  confirm + return
   ## -----------------------------------------------------------------
-  if (length(new_txt) == 1) {
-    fs::file_move(new_txt, output_file)
+  if (fs::file_exists(output_file)) {
     cat("✅ Model saved to:", output_file, "\n")
     invisible(list(
       status     = "success",
@@ -96,7 +97,7 @@ process_model <- function(m,
       model_file = output_file
     ))
   } else {
-    cat("❌ Could not locate new .txt model output.\n")
+    cat("❌ writeFBAfile() did not create", output_file, "\n")
     invisible(list(
       status  = "error",
       message = "Model file not created",

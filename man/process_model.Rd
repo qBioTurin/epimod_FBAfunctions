@@ -7,13 +7,14 @@
 process_model(m, hypernode_name, mat_dir, base_dir = getwd())
 }
 \arguments{
-\item{m}{A list for one cellular unit, as returned by
-\code{make_biounit_models()}.}
+\item{m}{A list for one cellular unit (from
+\code{make_biounit_models()}).}
 
-\item{hypernode_name}{Character.  Parent hyper-node label.}
+\item{hypernode_name}{Character. Parent hyper-node label.}
 
-\item{mat_dir}{Folder that contains the user-supplied \emph{.mat} files
-(the same value you pass to \code{build_hypernode()}).}
+\item{mat_dir}{Directory that contains the user-supplied
+\emph{.mat} files (same value you pass to
+\code{build_hypernode()}).}
 
 \item{base_dir}{Root working directory (default = \code{getwd()}).}
 }
@@ -21,6 +22,9 @@ process_model(m, hypernode_name, mat_dir, base_dir = getwd())
 (Invisibly) a list with status and created paths.
 }
 \description{
-Copies the chosen \emph{.mat} file into the hyper-node workspace, converts
-it to a text FBA model, and returns the path to that \emph{.txt}.
+\itemize{
+\item Copies the chosen \emph{.mat} file into the hyper-node workspace
+\item Converts it to a text FBA model with \code{writeFBAfile()}
+\item Returns the path to that single \emph{.txt} file
+}
 }
