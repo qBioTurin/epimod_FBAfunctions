@@ -5,7 +5,8 @@
 project_boundary_reactions <- function(biounit_models,
                                        boundary_metabolites,
                                        out_dir,
-                                       hypernode_name) {
+                                       hypernode_name,
+                                       base_dir = getwd()) {
 
   # ──────────────────────────────────────────────────────────
   # Build dataframe describing each model
