@@ -76,7 +76,7 @@ build_hypernode <- function(hypernode_name,
     biounit= fs::path(hyper_root, "biounits"),
     gen    = fs::path(hyper_root, "gen")
   )
-  purrr::walk(paths, fs::dir_create, recursive = TRUE)
+  purrr::walk(paths, fs::dir_create, recurse = TRUE)
 
   # local petri_nets_library (mirrors old script)
   petri_lib <- fs::path(base_dir, "petri_nets_library")

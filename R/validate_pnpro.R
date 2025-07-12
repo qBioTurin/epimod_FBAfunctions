@@ -1,6 +1,8 @@
 # ---------------------------------------------------------------------
 # Validate and repair a PNPRO file against a set of FBA models — DEBUG
 # ---------------------------------------------------------------------
+#' @export
+#'
 validate_pnpro <- function(pnpro2validate,
                            hypernode_root,
                            biounit_models,

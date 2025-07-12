@@ -2,6 +2,7 @@
 #'
 #' (Same logic as your original; only extra `message()` lines.)
 #' @export
+#'
 project_boundary_reactions <- function(biounit_models,
                                        boundary_metabolites,
                                        out_dir,
