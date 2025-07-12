@@ -2,16 +2,16 @@
 % Please edit documentation in R/generate_pnpro.R
 \name{generate_pnpro}
 \alias{generate_pnpro}
-\title{Generate a PNPRO XML from an arc table – DEBUG build}
+\title{Generate a PNPRO XML file from an arc table  — debug build}
 \usage{
 generate_pnpro(arc_df, pnpro_out)
 }
 \arguments{
-\item{arc_df}{Data-frame containing columns
+\item{arc_df}{Data-frame with columns
 \verb{place, transition, direction, multiplicity, command}}
 
-\item{pnpro_out}{Path to write the \emph{.PNPRO} file.}
+\item{pnpro_out}{Path of the PNPRO file to write.}
 }
 \description{
-Generate a PNPRO XML from an arc table – DEBUG build
+Generate a PNPRO XML file from an arc table  — debug build
 }
