@@ -2,16 +2,15 @@
 % Please edit documentation in R/project_boundary_reactions.R
 \name{project_boundary_reactions}
 \alias{project_boundary_reactions}
-\title{Project boundary reactions across a set of FBA models (debug build)}
+\title{Project boundary reactions across a set of FBA models  — debug build}
 \usage{
 project_boundary_reactions(
   biounit_models,
   boundary_metabolites,
   out_dir,
-  hypernode_name,
-  base_dir = getwd()
+  hypernode_name
 )
 }
 \description{
-Project boundary reactions across a set of FBA models (debug build)
+(Same logic as your original; only extra \code{message()} lines.)
 }
