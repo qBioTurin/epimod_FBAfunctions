@@ -125,7 +125,11 @@ build_hypernode <- function(hypernode_name,
   message("▶ building biounit models …")
   biounit_models <- epimodFBAfunctions::make_biounit_models(mat_paths, biomass_params, pop_params, init_counts)
   epimodFBAfunctions::write_population_params(biounit_models, fs::path(paths$config, "population_parameters.csv"))
-  purrr::walk(biounit_models, ~epimodFBAfunctions::process_model(.x, hypernode_name))
+	purrr::walk(biounit_models, ~epimodFBAfunctions::process_model(
+		.x,
+		hypernode_name = hypernode_name,
+		base_dir       = base_dir))
+
 
   # 5) Boundary projection + PN repair --------------------------------
   epimodFBAfunctions::project_boundary_reactions(biounit_models, cfg$boundary_metabolites, paths$output, hypernode_name)
