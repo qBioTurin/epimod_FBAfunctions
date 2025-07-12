@@ -1,21 +1,5 @@
-#' Project boundary reactions across a set of FBA models
+#' Project boundary reactions across a set of FBA models (debug build)
 #'
-#' Scans each biounit’s metadata, finds reactions that involve the
-#' user-defined `boundary_metabolites`, and writes:
-#'   * `extracted_boundary_reactions.txt`
-#'   * `common_reactions.txt`
-#'   * `exclusive_reactions_<org>.txt`
-#'   * one CSV with bounds for every organism
-#'   * irreversible-form CSVs for each organism
-#'
-#' @param biounit_models       List returned by `make_biounit_models()`.
-#' @param boundary_metabolites Character vector of metabolite IDs.
-#' @param out_dir              Output folder for the text / CSV artefacts.
-#' @param hypernode_name       Parent hyper-node label.
-#' @param base_dir             Root working directory (default = `getwd()`).
-#'
-#' @return (Invisibly) a list with shared / common / exclusive reactions
-#'         and a tibble of reaction bounds.
 #' @export
 project_boundary_reactions <- function(biounit_models,
                                        boundary_metabolites,
@@ -23,20 +7,17 @@ project_boundary_reactions <- function(biounit_models,
                                        hypernode_name,
                                        base_dir = getwd()) {
 
-  ## helper ──────────────────────────────────────────────────────────
-  #  strip any directory and ".mat" extension from FBAmodel
-  clean_name <- function(x)
-    tools::file_path_sans_ext(fs::path_file(x))
+  ## helper ─ strip any path + ".mat"
+  clean_name <- function(x) tools::file_path_sans_ext(fs::path_file(x))
 
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   ##  Build dataframe describing each model
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   models_df <- tibble::tibble(model = biounit_models) %>%
     dplyr::mutate(
       abbr    = purrr::map_chr(model, ~ .x$abbreviation[2]),
       FBAname = purrr::map_chr(model, ~ clean_name(.x$FBAmodel)),
 
-      # absolute paths: <base_dir>/hypernodes/<node>/biounits/<model>/
       model_file = fs::path(base_dir, "hypernodes", hypernode_name,
                             "biounits", FBAname, paste0(FBAname, ".mat")),
       meta_dir   = fs::path(base_dir, "hypernodes", hypernode_name,
@@ -44,30 +25,39 @@ project_boundary_reactions <- function(biounit_models,
     ) %>%
     dplyr::filter(file.exists(model_file)) %>%
     dplyr::mutate(
-      metabolites = purrr::map(meta_dir, ~ readr::read_csv(
-        fs::path(.x, "metabolites_metadata.csv"), show_col_types = FALSE)),
+      metabolites = purrr::map(meta_dir, ~ {
+        f <- fs::path(.x, "metabolites_metadata.csv")
+        message("🔍 reading metabolites: ", f)
+        readr::read_csv(f, show_col_types = FALSE)
+      }),
       reactions   = purrr::map(meta_dir, ~ {
-        rx <- readr::read_csv(
-          fs::path(.x, "reactions_metadata.csv"), show_col_types = FALSE)
-        # normalise possible capitalisations of `type`
+        f <- fs::path(.x, "reactions_metadata.csv")
+        message("🔍 reading reactions   : ", f)
+        rx <- readr::read_csv(f, show_col_types = FALSE)
+        message("   columns = ", paste(names(rx), collapse = ", "))
+
+        # ensure column `type` exists
         if (!"type" %in% names(rx)) {
           alt <- intersect(c("Type", "reaction_type", "Subtype"), names(rx))
-          if (length(alt) == 1) rx <- dplyr::rename(rx, type = !!alt)
+          if (length(alt) == 1) {
+            rx <- dplyr::rename(rx, type = !!rlang::sym(alt))
+            message("   renamed column ", alt, " → type")
+          }
         }
         rx
       })
     )
 
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   ##  Extract boundary reactions
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   boundary_df <- models_df %>%
     dplyr::select(abbr, reactions) %>%
     tidyr::unnest(reactions) %>%
     dplyr::filter(type == "boundary") %>%
     dplyr::select(abbr, reaction = abbreviation, lowbnd, uppbnd, equation)
 
-  ## match projectable metabolites to boundary reactions ─────────────
+  ## match projectable metabolites to boundary reactions -------------
   shared_rxns_df <- models_df %>%
     tidyr::unnest(metabolites) %>%
     dplyr::filter(id %in% boundary_metabolites) %>%
@@ -78,15 +68,15 @@ project_boundary_reactions <- function(biounit_models,
                                       stringr::str_c("\\b", id, "\\b"))) %>%
     dplyr::distinct(abbr, reaction, lowbnd, uppbnd)
 
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   ##  Organise projections
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   shared_list <- shared_rxns_df %>%
     dplyr::group_by(abbr) %>%
     dplyr::summarise(rxns = list(reaction), .groups = "drop")
 
-  all_models   <- shared_list$abbr
-  joint_rxns   <- unique(shared_rxns_df$reaction)
+  all_models <- shared_list$abbr
+  joint_rxns <- unique(shared_rxns_df$reaction)
 
   reaction_orgs <- shared_rxns_df %>%
     dplyr::distinct(abbr, reaction) %>%
@@ -100,9 +90,9 @@ project_boundary_reactions <- function(biounit_models,
   exclusive_list <- shared_list %>%
     dplyr::mutate(excl = purrr::map(rxns, ~ setdiff(.x, common_rxns)))
 
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   ##  Write outputs
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
   readr::write_lines(joint_rxns,
@@ -131,12 +121,12 @@ project_boundary_reactions <- function(biounit_models,
 
   bounds_tbl %>%
     dplyr::group_by(organism) %>%
-    dplyr::group_walk(~ readr::write_csv(.x,
-         fs::path(out_dir, sprintf("per_bounds_%s.csv", .y$organism))))
+    dplyr::group_walk(~ readr::write_csv(
+      .x, fs::path(out_dir, sprintf("per_bounds_%s.csv", .y$organism))))
 
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   ##  Generate irreversible network versions
-  ## -----------------------------------------------------------------
+  ## ─────────────────────────────────────────────────────────────────
   cat("\nGenerating irreversible network references...\n")
 
   models_df %>%
@@ -146,7 +136,7 @@ project_boundary_reactions <- function(biounit_models,
     dplyr::group_walk(~ {
       irr_net <- .x %>%
         dplyr::mutate(
-          is_reversible = lowbnd < 0 & uppbnd > 0,
+          is_reversible    = lowbnd < 0 & uppbnd > 0,
           forward_reaction = dplyr::if_else(is_reversible,
                                             paste0(abbreviation, "_f"),
                                             abbreviation),
@@ -174,18 +164,13 @@ project_boundary_reactions <- function(biounit_models,
         ) %>%
         dplyr::select(reaction, lb, ub)
 
-      irr_output <- fs::path(out_dir,
-                             sprintf("irreversible_reactions_%s.csv",
-                                     unique(.y$abbr)))
-      readr::write_csv(irr_long, irr_output)
-
-      cat(sprintf("  \u2713 Irreversible network saved for %s: %s\n",
-                  unique(.y$abbr), irr_output))
+      irr_out <- fs::path(out_dir,
+                          sprintf("irreversible_reactions_%s.csv",
+                                  unique(.y$abbr)))
+      readr::write_csv(irr_long, irr_out)
+      cat(sprintf("  ✔ irreversible saved for %s\n", unique(.y$abbr)))
     })
 
-  ## -----------------------------------------------------------------
-  ##  Return for programmatic use
-  ## -----------------------------------------------------------------
   invisible(list(
     shared_reactions    = purrr::set_names(shared_list$rxns,
                                            shared_list$abbr),
