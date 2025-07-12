@@ -20,8 +20,8 @@ derive_abbrs <- function(model_name) {
 
   # candidate 3: if there are exactly two parts, 1st letter + 2nd letter
   if (length(parts) == 2)
-    abbrs <- c(abbrs, paste0(substr(parts[1], 1, 1),
-                             substr(parts[2], 1, 1)))
+    abbrs <- c(abbrs,
+               paste0(substr(parts[1], 1, 1), substr(parts[2], 1, 1)))
 
   abbrs <- unique(tolower(abbrs))
 
@@ -33,7 +33,7 @@ derive_abbrs <- function(model_name) {
 }
 
 # ---------------------------------------------------------------------------
-# Build a general-purpose list of FBA-compatible biounits ─ DEBUG
+# Build a general-purpose list of FBA-compatible biounits ─ DEBUG + FIX
 # ---------------------------------------------------------------------------
 #' @export
 make_biounit_models <- function(model_names,
@@ -47,17 +47,23 @@ make_biounit_models <- function(model_names,
 
   lapply(seq_along(model_names), function(i) {
 
-    mn     <- model_names[i]
-    abbrs  <- derive_abbrs(mn)
+    raw_path <- model_names[i]
+
+    ## ─── NEW: strip directory & “.mat” ──────────────────────────────
+    short    <- tools::file_path_sans_ext(fs::path_file(raw_path))
+    # e.g. “/…/Escherichia_coli_SE11.mat” → “Escherichia_coli_SE11”
+
+    abbrs <- derive_abbrs(short)
 
     ## ─── debug ──────────────────────────────────────────────────────
-    message(sprintf("make_biounit_models(): [%02d] %s", i, mn))
+    message(sprintf("make_biounit_models(): [%02d] %s", i, short))
     message("  › abbr[1] = ", abbrs[1],
             "; abbr[2] = ", abbrs[2])
 
     list(
-      FBAmodel            = mn,
-      unit                = gsub("_", " ", mn),
+      # keep the full path so downstream functions can still read the file
+      FBAmodel            = raw_path,
+      unit                = gsub("_", " ", short),
       abbreviation        = abbrs,
       txt_file            = paste0(abbrs[2], "_model.txt"),
       biomass             = biomass_params[[i]],
@@ -75,7 +81,7 @@ write_population_params <- function(biounit_models, path) {
 
   message("write_population_params(): writing → ", path)
 
-  # Turn each population_settings list into a 1×3 data.frame
+  # Turn each population_settings list into a 1 × 3 data.frame
   df <- do.call(rbind, lapply(biounit_models, function(unit) {
     as.data.frame(as.list(unit$population_settings), stringsAsFactors = FALSE)
   }))
