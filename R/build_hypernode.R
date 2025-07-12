@@ -40,6 +40,7 @@
 build_hypernode <- function(hypernode_name,
                             config_yaml,
                         		boundary_conditions_file,
+                        		initial_data,
                             mat_dir        = "models",
                             base_dir       = getwd(),
                             overwrite      = FALSE,
@@ -83,6 +84,7 @@ build_hypernode <- function(hypernode_name,
   fs::dir_create(petri_lib)
 
   # 2) Load YAML (+ optional JSON) ------------------------------------
+  fs::file_copy(initial_data, paths$config, overwrite = TRUE)
   fs::file_copy(config_yaml, paths$config, overwrite = TRUE)
   cfg_path <- fs::path(paths$config, fs::path_file(config_yaml))
   cfg      <- yaml::read_yaml(cfg_path)
@@ -195,6 +197,7 @@ build_hypernode <- function(hypernode_name,
     src <- fs::path(base_dir, paste0(hypernode_name, ext))
     if (fs::file_exists(src)) fs::file_move(src, paths$gen)
   })
+  
 
   epimod::model.analysis(solver_fname     = fs::path(paths$gen, paste0(hypernode_name, ".solver")),
                          parameters_fname = fs::path(paths$config, fs::path_file("initial_data.csv")),

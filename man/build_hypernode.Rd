@@ -8,6 +8,7 @@ build_hypernode(
   hypernode_name,
   config_yaml,
   boundary_conditions_file,
+  initial_data,
   mat_dir = "models",
   base_dir = getwd(),
   overwrite = FALSE,
