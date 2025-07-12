@@ -87,15 +87,20 @@ build_hypernode <- function(hypernode_name,
   cfg_path <- fs::path(paths$config, fs::path_file(config_yaml))
   cfg      <- yaml::read_yaml(cfg_path)
 
-  if (!is.null(cfg$boundary_conditions_file)) {
-    bc_file <- cfg$boundary_conditions_file
-    if (!fs::is_absolute_path(bc_file))
-      bc_file <- fs::path(dirname(cfg_path), bc_file)   # resolve relative
-    if (!fs::file_exists(bc_file))
-      stop("boundary_conditions_file not found: ", bc_file)
-    bc_json <- jsonlite::fromJSON(bc_file, simplifyVector = TRUE)
-    cfg <- utils::modifyList(cfg, bc_json)
-  }
+  # ----- boundary_conditions_file argument --------------------------
+  if (missing(boundary_conditions_file) || is.null(boundary_conditions_file))
+    stop("`boundary_conditions_file` (JSON) must be supplied explicitly.")
+
+  if (!fs::file_exists(boundary_conditions_file))
+    stop("boundary_conditions_file not found: ", boundary_conditions_file)
+
+  # copy next to YAML (re-run reproducibility)
+  fs::file_copy(boundary_conditions_file, paths$config, overwrite = TRUE)
+  bc_path <- fs::path(paths$config, fs::path_file(boundary_conditions_file))
+
+  # merge JSON content into cfg, JSON values take precedence
+  bc_json <- jsonlite::fromJSON(bc_path, simplifyVector = TRUE)
+  cfg     <- utils::modifyList(cfg, bc_json)
 
   # 3) Resolve *.mat ---------------------------------------------------
   find_mat <- function(name) {
