@@ -23,26 +23,39 @@ project_boundary_reactions <- function(biounit_models,
                                        hypernode_name,
                                        base_dir = getwd()) {
 
+  ## helper ──────────────────────────────────────────────────────────
+  #  strip any directory and ".mat" extension from FBAmodel
+  clean_name <- function(x)
+    tools::file_path_sans_ext(fs::path_file(x))
+
   ## -----------------------------------------------------------------
   ##  Build dataframe describing each model
   ## -----------------------------------------------------------------
   models_df <- tibble::tibble(model = biounit_models) %>%
     dplyr::mutate(
-      abbr       = purrr::map_chr(model, ~ .x$abbreviation[2]),
-      FBAmodel   = purrr::map_chr(model, ~ .x$FBAmodel),
+      abbr    = purrr::map_chr(model, ~ .x$abbreviation[2]),
+      FBAname = purrr::map_chr(model, ~ clean_name(.x$FBAmodel)),
 
       # absolute paths: <base_dir>/hypernodes/<node>/biounits/<model>/
       model_file = fs::path(base_dir, "hypernodes", hypernode_name,
-                            "biounits", FBAmodel, paste0(FBAmodel, ".mat")),
+                            "biounits", FBAname, paste0(FBAname, ".mat")),
       meta_dir   = fs::path(base_dir, "hypernodes", hypernode_name,
-                            "biounits", FBAmodel)
+                            "biounits", FBAname)
     ) %>%
     dplyr::filter(file.exists(model_file)) %>%
     dplyr::mutate(
       metabolites = purrr::map(meta_dir, ~ readr::read_csv(
         fs::path(.x, "metabolites_metadata.csv"), show_col_types = FALSE)),
-      reactions   = purrr::map(meta_dir, ~ readr::read_csv(
-        fs::path(.x, "reactions_metadata.csv"),   show_col_types = FALSE))
+      reactions   = purrr::map(meta_dir, ~ {
+        rx <- readr::read_csv(
+          fs::path(.x, "reactions_metadata.csv"), show_col_types = FALSE)
+        # normalise possible capitalisations of `type`
+        if (!"type" %in% names(rx)) {
+          alt <- intersect(c("Type", "reaction_type", "Subtype"), names(rx))
+          if (length(alt) == 1) rx <- dplyr::rename(rx, type = !!alt)
+        }
+        rx
+      })
     )
 
   ## -----------------------------------------------------------------
@@ -54,19 +67,20 @@ project_boundary_reactions <- function(biounit_models,
     dplyr::filter(type == "boundary") %>%
     dplyr::select(abbr, reaction = abbreviation, lowbnd, uppbnd, equation)
 
-  ## match projectable metabolites to boundary reactions --------------
+  ## match projectable metabolites to boundary reactions ─────────────
   shared_rxns_df <- models_df %>%
     tidyr::unnest(metabolites) %>%
     dplyr::filter(id %in% boundary_metabolites) %>%
     dplyr::distinct(abbr, id) %>%
-    dplyr::left_join(boundary_df,
-                     by = "abbr",
+    dplyr::left_join(boundary_df, by = "abbr",
                      relationship = "many-to-many") %>%
     dplyr::filter(stringr::str_detect(equation,
                                       stringr::str_c("\\b", id, "\\b"))) %>%
     dplyr::distinct(abbr, reaction, lowbnd, uppbnd)
 
-  ## Organise projections --------------------------------------------
+  ## -----------------------------------------------------------------
+  ##  Organise projections
+  ## -----------------------------------------------------------------
   shared_list <- shared_rxns_df %>%
     dplyr::group_by(abbr) %>%
     dplyr::summarise(rxns = list(reaction), .groups = "drop")
