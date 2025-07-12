@@ -10,19 +10,23 @@ project_boundary_reactions <- function(biounit_models,
 
   message("\n─── building model dataframe ──────────────────────────────")
 
+  # helper: drop any directory and the ".mat" extension
+  clean_name <- function(x) tools::file_path_sans_ext(fs::path_file(x))
   models_df <- tibble::tibble(model = biounit_models) %>%
     dplyr::mutate(
       abbr = purrr::map_chr(model, ~ {
-        val <- .x$abbreviation[2]
+        raw <- .x$abbreviation[2]
+        val <- sub("^/", "", clean_name(raw))      # remove leading slash
         message("   ↪ abbr extracted: ", val)
         val
       }),
-      FBAmodel = purrr::map_chr(model, ~ .x$FBAmodel),
+
+      FBAname = purrr::map_chr(model, ~ clean_name(.x$FBAmodel)),
 
       model_file = file.path("hypernodes", hypernode_name,
-                             "biounits", FBAmodel, paste0(FBAmodel, ".mat")),
+                             "biounits", FBAname, paste0(FBAname, ".mat")),
       meta_dir   = file.path("hypernodes", hypernode_name,
-                             "biounits", FBAmodel)
+                             "biounits", FBAname)
     )
 
   message("\n🔍 expecting these .mat files:")
