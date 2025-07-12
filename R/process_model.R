@@ -46,8 +46,8 @@ process_model <- function(m,
   ## -----------------------------------------------------------------
   ##  target folders inside the hyper-node
   ## -----------------------------------------------------------------
-  input_dir <- fs::path_abs(base_dir, "hypernodes", hypernode_name,
-                            "biounits", FBAmodel)
+ input_dir <- abs_path(base_dir, "hypernodes", hypernode_name,
+                      "biounits", FBAmodel)
   fs::dir_create(input_dir, recurse = TRUE)
 
   output_file <- fs::path(input_dir, paste0(abbr, "_model.txt"))
