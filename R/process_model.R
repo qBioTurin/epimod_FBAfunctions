@@ -71,19 +71,20 @@ process_model <- function(m,
     bioMin  = m$biomass$min
   )
 
-  ## -----------------------------------------------------------------
-  ##  write the FBA text file  (exactly one “.txt”)
-  ## -----------------------------------------------------------------
-  fba_base     <- paste0(abbr, "_model")                 # no extension
-  output_file  <- fs::path(input_dir, paste0(fba_base, ".txt"))
+	## -----------------------------------------------------------------
+	##  write the FBA text file  (exactly one “.txt”)
+	## -----------------------------------------------------------------
+	fba_base    <- paste0(abbr, "_model")                 # no extension
+	output_file <- fs::path(input_dir, paste0(fba_base, ".txt"))
 
-  cat("📝 Writing model with writeFBAfile() …\n")
+	cat("📝 Writing model with writeFBAfile() …\n")
 
-  writeFBAfile(
-    model_obj,
-    fba_fname = fba_base,        # writeFBAfile() appends “.txt”
-    dest_dir  = input_dir
-  )
+	writeFBAfile(
+		model_obj,
+		fba_fname = fba_base,
+		dest_dir  = fs::path(input_dir, "")   # <-- ensures trailing “/”
+	)
+
 
   ## -----------------------------------------------------------------
   ##  confirm + return
