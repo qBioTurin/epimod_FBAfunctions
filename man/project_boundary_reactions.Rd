@@ -8,9 +8,33 @@ project_boundary_reactions(
   biounit_models,
   boundary_metabolites,
   out_dir,
-  hypernode_name
+  hypernode_name,
+  base_dir = getwd()
 )
 }
+\arguments{
+\item{biounit_models}{List returned by \code{make_biounit_models()}.}
+
+\item{boundary_metabolites}{Character vector of metabolite IDs.}
+
+\item{out_dir}{Output folder for the text / CSV artefacts.}
+
+\item{hypernode_name}{Parent hyper-node label.}
+
+\item{base_dir}{Root working directory (default = \code{getwd()}).}
+}
+\value{
+(Invisibly) a list with shared / common / exclusive reactions
+and a tibble of reaction bounds.
+}
 \description{
-Project boundary reactions across a set of FBA models
+Scans each biounit’s metadata, finds reactions that involve the
+user-defined \code{boundary_metabolites}, and writes:
+\itemize{
+\item \code{extracted_boundary_reactions.txt}
+\item \code{common_reactions.txt}
+\item \verb{exclusive_reactions_<org>.txt}
+\item one CSV with bounds for every organism
+\item irreversible-form CSVs for each organism
+}
 }

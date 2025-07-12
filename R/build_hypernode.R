@@ -135,7 +135,13 @@ build_hypernode <- function(hypernode_name,
 	)
 
   # 5) Boundary projection + PN repair --------------------------------
-  epimodFBAfunctions::project_boundary_reactions(biounit_models, cfg$boundary_metabolites, paths$output, hypernode_name)
+	epimodFBAfunctions::project_boundary_reactions(
+		biounit_models       = biounit_models,
+		boundary_metabolites = cfg$boundary_metabolites,
+		out_dir              = paths$output,
+		hypernode_name       = hypernode_name,
+		base_dir             = base_dir   
+	)
 
   epimodFBAfunctions::validate_pnpro(pnpro_template, hyper_root, biounit_models, cfg$boundary_metabolites, paths$output, hypernode_name)
 
