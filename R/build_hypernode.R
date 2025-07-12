@@ -48,10 +48,8 @@ build_hypernode <- function(hypernode_name,
   abs_path <- function(x) fs::path_abs(fs::path_expand(x))
 
   # 0)  Resolve PNPRO template ----------------------------------------
-  if (!fs::file_exists(pnpro_template)) {
-    pnpro_template <- system.file("extdata", "blank.PNPRO",
-                                  package = "epimodFBAfunctions")
-  }
+  pnpro_template <- system.file("extdata", "blank.PNPRO",
+                                package = "epimodFBAfunctions")
   
   if (pnpro_template == "")
     stop("PNPRO template not found: ", pnpro_template)
