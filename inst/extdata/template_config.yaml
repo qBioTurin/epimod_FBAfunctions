@@ -1,0 +1,6 @@
+boundary_metabolites: []    
+
+cellular_units:
+  - model_name: Escherichia_coli_SE11
+    initial_count: 1e6
+
