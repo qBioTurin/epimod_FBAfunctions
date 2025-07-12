@@ -9,7 +9,7 @@ validate_pnpro <- function(pnpro2validate,
                            out_dir,
                            hypernode_name) {
 
-  ## helper: strip any path + “.mat” extension
+  ## helper ───────────────────────────────────────────────────────────
   clean_name <- function(x) tools::file_path_sans_ext(fs::path_file(x))
 
   message("\n─── 0) reading PNPRO ───────────────────────────────────────")
@@ -47,7 +47,7 @@ validate_pnpro <- function(pnpro2validate,
   message("✔ parsed arcs: ", nrow(arc_df))
 
   # ------------------------------------------------------------------
-  # 1) load metabolites & reactions metadata
+  # 1) load metadata
   # ------------------------------------------------------------------
   message("\n─── 1) loading metadata ───────────────────────────────────")
 
@@ -72,17 +72,11 @@ validate_pnpro <- function(pnpro2validate,
       })
     )
 
-  ## 🔸 A — keep every metabolite row; just flag those not in boundary_list
   met_tbl <- models_df %>%
     tidyr::unnest(metabolites) %>%
     dplyr::mutate(in_boundary = id %in% boundary_metabolites)
 
-  if (any(!met_tbl$in_boundary)) {
-    message("⚠ metabolites auto-kept that were *not* in boundary list: ",
-            paste(unique(met_tbl$id[!met_tbl$in_boundary]), collapse = ", "))
-  }
-
-  projectable_df <- met_tbl %>%                 # ← no filter here
+  projectable_df <- met_tbl %>%      # keep all, just flag
     dplyr::select(abbr, met_id = id)
 
   boundary_df <- models_df %>%
@@ -100,7 +94,7 @@ validate_pnpro <- function(pnpro2validate,
   message("✔ projectable reactions: ", nrow(shared_rxns_df))
 
   # ------------------------------------------------------------------
-  # 2) parse original FBA[ ] / Call[ ] commands
+  # 2) original FBA / Call commands
   # ------------------------------------------------------------------
   message("\n─── 2) rebuilding commands ───────────────────────────────")
 
@@ -116,8 +110,6 @@ validate_pnpro <- function(pnpro2validate,
     ) %>%
     dplyr::select(transition, delay, reaction, abbr)
 
-  message("✔ original FBA cmds: ", nrow(fba_cmds))
-
   call_cmds <- tibble::tibble(transition = t_names, delay = t_delays) %>%
     dplyr::filter(stringr::str_detect(delay, "^Call\\[")) %>%
     dplyr::mutate(
@@ -130,10 +122,11 @@ validate_pnpro <- function(pnpro2validate,
     ) %>%
     dplyr::select(transition, command = delay, fun_name, param_expr, org_index)
 
+  message("✔ original FBA cmds:  ", nrow(fba_cmds))
   message("✔ original Call cmds: ", nrow(call_cmds))
 
   # ------------------------------------------------------------------
-  # 2a) rebuild FBA commands (import & export)
+  # 2a) rebuild FBA commands
   # ------------------------------------------------------------------
   biomass_rxns <- tibble::tibble(
     abbr     = models_df$abbr,
@@ -153,8 +146,7 @@ validate_pnpro <- function(pnpro2validate,
     dplyr::mutate(
       transition = paste0(
         reaction,
-        dplyr::if_else(direction == "INPUT", "_in_", "_out_"),
-        abbr),
+        dplyr::if_else(direction == "INPUT", "_in_", "_out_"), abbr),
       place   = dplyr::if_else(reaction == "EX_biomass_e",
                                biomass_place, met_id),
       command = sprintf(
@@ -162,14 +154,11 @@ validate_pnpro <- function(pnpro2validate,
         model_file, reaction, scaling, count_place, biomass_place,
         dplyr::if_else(is_biomass, ', "true"', ''))
     ) %>%
-    dplyr::select(transition, command, reaction, abbr, direction, place) %>%
-    ## 🔸 B — drop any row that *still* lacks place or direction
-    dplyr::filter(!is.na(place) & !is.na(direction))
-
-  message("✔ repaired FBA cmds: ", nrow(repaired_fba_cmds))
+    dplyr::filter(!is.na(place))    # <- guard
+  message("✔ repaired FBA cmds:  ", nrow(repaired_fba_cmds))
 
   # ------------------------------------------------------------------
-  # 2b) rebuild Call commands (population dynamics)
+  # 2b) rebuild Call commands
   # ------------------------------------------------------------------
   func_cols  <- c(Starvation = 0L, Duplication = 1L, Death = 2L)
   prefix_map <- c(Starvation = "Starv", Duplication = "Dup", Death = "Death")
@@ -184,14 +173,13 @@ validate_pnpro <- function(pnpro2validate,
         transition = paste0(prefix_map[fun_name], "_", abbr),
         command    = sprintf(
           'Call["%s", FromTable["population_parameters.csv", %d, %d], %d]',
-          fun_name, org_index, col_index, org_index)) %>%
-      dplyr::select(transition, command, fun_name, org_index, col_index)
+          fun_name, org_index, col_index, org_index))
   })
 
   message("✔ repaired Call cmds: ", nrow(repaired_call_cmds))
 
   # ------------------------------------------------------------------
-  # 3) build Call arcs
+  # 3) arcs for Call
   # ------------------------------------------------------------------
   call_arcs <- purrr::pmap_dfr(
     list(
@@ -206,25 +194,34 @@ validate_pnpro <- function(pnpro2validate,
       biomass_place <- paste0("biomass_e_", abbr)
 
       switch(fun_name,
-        Starvation = tibble::tibble(
-          transition, direction = "INPUT",
-          place = biomass_place, multiplicity = 1L, command),
+        Starvation =
+          tibble::tibble(transition = transition, direction = "INPUT",
+                         place = biomass_place, multiplicity = 1L, command = command),
 
-        Duplication = dplyr::bind_rows(
-          tibble::tibble(transition, "INPUT",  count_place,   1L, command),
-          tibble::tibble(transition, "INPUT",  biomass_place, 1L, command),
-          tibble::tibble(transition, "OUTPUT", count_place,   2L, command),
-          tibble::tibble(transition, "OUTPUT", biomass_place, 1L, command)),
+        Duplication =
+          dplyr::bind_rows(
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = count_place,   multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = biomass_place, multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "OUTPUT",
+                           place = count_place,   multiplicity = 2L, command = command),
+            tibble::tibble(transition = transition, direction = "OUTPUT",
+                           place = biomass_place, multiplicity = 1L, command = command)),
 
-        Death = dplyr::bind_rows(
-          tibble::tibble(transition, "INPUT",  count_place,   1L, command),
-          tibble::tibble(transition, "INPUT",  biomass_place, 1L, command),
-          tibble::tibble(transition, "OUTPUT", biomass_place, 1L, command))
+        Death =
+          dplyr::bind_rows(
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = count_place,   multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = biomass_place, multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "OUTPUT",
+                           place = biomass_place, multiplicity = 1L, command = command))
       )
     })
 
   # ------------------------------------------------------------------
-  # 4) build FBA arcs (import / export patterns)
+  # 4) arcs for FBA (IMPORT / EXPORT templates) – **named columns**
   # ------------------------------------------------------------------
   fba_arcs <- purrr::pmap_dfr(
     list(
@@ -239,35 +236,49 @@ validate_pnpro <- function(pnpro2validate,
       biomass_place <- paste0("biomass_e_", abbr)
 
       if (reaction != "EX_biomass_e") {
+
         if (stringr::str_ends(transition, paste0("_in_", abbr))) {
           # IMPORT
           dplyr::bind_rows(
-            tibble::tibble(transition, "INPUT",  met_place,     1L, command),
-            tibble::tibble(transition, "INPUT",  count_place,   1L, command),
-            tibble::tibble(transition, "INPUT",  biomass_place, 1L, command),
-            tibble::tibble(transition, "OUTPUT", count_place,   1L, command),
-            tibble::tibble(transition, "OUTPUT", biomass_place, 1L, command))
-        } else {
-          # EXPORT
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = met_place,     multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = count_place,   multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = biomass_place, multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "OUTPUT",
+                           place = count_place,   multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "OUTPUT",
+                           place = biomass_place, multiplicity = 1L, command = command))
+
+        } else {                                   # EXPORT
           dplyr::bind_rows(
-            tibble::tibble(transition, "INPUT",  count_place,   1L, command),
-            tibble::tibble(transition, "INPUT",  biomass_place, 1L, command),
-            tibble::tibble(transition, "OUTPUT", met_place,     1L, command),
-            tibble::tibble(transition, "OUTPUT", count_place,   1L, command),
-            tibble::tibble(transition, "OUTPUT", biomass_place, 1L, command))
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = count_place,   multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = biomass_place, multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "OUTPUT",
+                           place = met_place,     multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "OUTPUT",
+                           place = count_place,   multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "OUTPUT",
+                           place = biomass_place, multiplicity = 1L, command = command))
         }
-      } else {
-        # BIOMASS exchange
+
+      } else {  # EX_biomass_e -------------------------------------------------
+
         if (stringr::str_ends(transition, paste0("_in_", abbr))) {
-          tibble::tibble(transition, "INPUT",  biomass_place, 1L, command)
+          tibble::tibble(transition = transition, direction = "INPUT",
+                         place = biomass_place, multiplicity = 1L, command = command)
         } else {
           dplyr::bind_rows(
-            tibble::tibble(transition, "INPUT",  biomass_place, 1L, command),
-            tibble::tibble(transition, "OUTPUT", biomass_place, 2L, command))
+            tibble::tibble(transition = transition, direction = "INPUT",
+                           place = biomass_place, multiplicity = 1L, command = command),
+            tibble::tibble(transition = transition, direction = "OUTPUT",
+                           place = biomass_place, multiplicity = 2L, command = command))
         }
       }
-    }) %>%
-    stats::setNames(c("transition", "direction", "place", "multiplicity", "command"))
+    })
 
   # ------------------------------------------------------------------
   # 5) combine & save
@@ -282,7 +293,7 @@ validate_pnpro <- function(pnpro2validate,
   readr::write_csv(arc_df_repaired, fs::path(out_dir, "repaired_arcs.csv"))
   message("✔ CSVs written to ", out_dir)
 
-  invisible(list(raw_arcs = arc_df,
+  invisible(list(raw_arcs      = arc_df,
                  repaired_arcs = arc_df_repaired))
 }
 
