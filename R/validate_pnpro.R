@@ -45,27 +45,36 @@ validate_pnpro <- function(pnpro2validate,
 
   message("✔ arcs parsed: ", nrow(arc_df))
 
-	## 1) Re-derive boundary reactions --------------------------------------------
+	## 1) Re-derive boundary reactions -------------------------------------------
 	message("\n─── 1) scan FBA metadata ──────────────────────────────────")
 
-	clean_name <- function(x) tools::file_path_sans_ext(fs::path_file(x))  # helper
-
-	abbrs <- purrr::map_chr(biounit_models, ~ .x$abbreviation[2])
+	# --- cleaned vector of species abbreviations -------------------------------
+	abbrs <- purrr::map_chr(
+		biounit_models,
+		~ stringr::str_remove(.x$abbreviation[2], "^/+")   # << strip leading “/”
+	)
 
 	models_df <- tibble::tibble(model = biounit_models) %>%
 		dplyr::mutate(
-		  abbr        = purrr::map_chr(model, ~ .x$abbreviation[2]),
-		  fbamodel_id = purrr::map_chr(model, ~ clean_name(.x$FBAmodel)),   # <- clean
-		  meta_dir    = file.path(hypernode_root, "biounits", fbamodel_id)  # <- use it
+		  abbr        = purrr::map_chr(
+		                  model,
+		                  ~ stringr::str_remove(.x$abbreviation[2], "^/+")  # << again
+		                ),
+		  fbamodel_id = purrr::map_chr(model, ~ tools::file_path_sans_ext(
+		                                 fs::path_file(.x$FBAmodel))),
+		  meta_dir    = file.path(hypernode_root, "biounits", fbamodel_id)
 		) %>%
 		dplyr::mutate(
-		  metabolites = purrr::map(meta_dir, ~ readr::read_csv(
-		    file.path(.x, "metabolites_metadata.csv"), show_col_types = FALSE)),
-		  reactions   = purrr::map(meta_dir, ~ readr::read_csv(
-		    file.path(.x, "reactions_metadata.csv"),   show_col_types = FALSE))
+		  metabolites = purrr::map(meta_dir,
+		    ~ readr::read_csv(file.path(.x, "metabolites_metadata.csv"),
+		                      show_col_types = FALSE)),
+		  reactions   = purrr::map(meta_dir,
+		    ~ readr::read_csv(file.path(.x, "reactions_metadata.csv"),
+		                      show_col_types = FALSE))
 		)
 
 	message("✔ biounits loaded: ", nrow(models_df))
+
 
 
   projectable_df <- models_df %>%
