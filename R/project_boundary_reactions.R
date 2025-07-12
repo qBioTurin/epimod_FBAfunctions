@@ -8,42 +8,46 @@ project_boundary_reactions <- function(biounit_models,
                                        hypernode_name,
                                        base_dir = getwd()) {
 
-  # ──────────────────────────────────────────────────────────
-  # Build dataframe describing each model
-  # ──────────────────────────────────────────────────────────
-  models_df <- tibble(model = biounit_models) %>%
-    mutate(
-      abbr     = map_chr(model, ~ .x$abbreviation[2]),
-      FBAmodel = map_chr(model, ~ .x$FBAmodel),
+  message("\n─── building model dataframe ──────────────────────────────")
+
+  models_df <- tibble::tibble(model = biounit_models) %>%
+    dplyr::mutate(
+      abbr = purrr::map_chr(model, ~ {
+        val <- .x$abbreviation[2]
+        message("   ↪ abbr extracted: ", val)
+        val
+      }),
+      FBAmodel = purrr::map_chr(model, ~ .x$FBAmodel),
+
       model_file = file.path("hypernodes", hypernode_name,
                              "biounits", FBAmodel, paste0(FBAmodel, ".mat")),
       meta_dir   = file.path("hypernodes", hypernode_name,
                              "biounits", FBAmodel)
     )
 
-  message("🔍 expecting these .mat files:\n",
-          paste(models_df$model_file, collapse = "\n  "))
+  message("\n🔍 expecting these .mat files:")
+  purrr::walk(models_df$model_file, ~ message("   ", .x))
 
-  models_df <- models_df %>%
-    filter(file.exists(model_file))
+  models_df <- dplyr::filter(models_df, file.exists(model_file))
+  message("✔ models FOUND: ", nrow(models_df))
 
-  message("✔ models found: ", nrow(models_df))
-
-  models_df <- models_df %>%
-    mutate(
-      metabolites = map(meta_dir, ~ {
-        f <- file.path(.x, "metabolites_metadata.csv")
-        message("   ↪ reading metabolites: ", f)
-        read_csv(f, show_col_types = FALSE)
-      }),
-      reactions   = map(meta_dir, ~ {
-        f <- file.path(.x, "reactions_metadata.csv")
-        message("   ↪ reading reactions  : ", f)
-        rx <- read_csv(f, show_col_types = FALSE)
-        message("     columns: ", paste(names(rx), collapse = ", "))
-        rx
-      })
-    )
+  models_df <- dplyr::mutate(
+    models_df,
+    metabolites = purrr::map(meta_dir, ~ {
+      f <- file.path(.x, "metabolites_metadata.csv")
+      message("   ↪ reading metabolites : ", f)
+      readr::read_csv(f, show_col_types = FALSE)
+    }),
+    reactions = purrr::map(meta_dir, ~ {
+      f <- file.path(.x, "reactions_metadata.csv")
+      message("   ↪ reading reactions    : ", f)
+      rx <- readr::read_csv(f, show_col_types = FALSE)
+      message("     columns: ", paste(names(rx), collapse = ", "))
+      message("     first 5 abbreviations: ",
+              paste(head(rx$abbreviation, 5), collapse = ", "))
+      rx
+    })
+  )
 
   # ──────────────────────────────────────────────────────────
   # Extract boundary reactions
@@ -59,13 +63,14 @@ project_boundary_reactions <- function(biounit_models,
 
   # Match projectable metabolites to boundary reactions
   shared_rxns_df <- models_df %>%
-    unnest(metabolites) %>%
-    filter(id %in% boundary_metabolites) %>%
-    distinct(abbr, id) %>%
-    left_join(boundary_df, by = "abbr",
-              relationship = "many-to-many") %>%
-    filter(str_detect(equation, str_c("\\b", id, "\\b"))) %>%
-    distinct(abbr, reaction, lowbnd, uppbnd)
+    tidyr::unnest(metabolites) %>%
+    dplyr::filter(id %in% boundary_metabolites) %>%
+    dplyr::distinct(abbr, id) %>%
+    dplyr::left_join(boundary_df, by = "abbr",
+                     relationship = "many-to-many") %>%
+    dplyr::filter(stringr::str_detect(equation,
+               stringr::str_c("\\b", id, "\\b"))) %>%
+    dplyr::distinct(abbr, reaction, lowbnd, uppbnd)
 
   message("✔ shared_rxns_df rows: ", nrow(shared_rxns_df))
 
@@ -73,23 +78,23 @@ project_boundary_reactions <- function(biounit_models,
   # Organise projections
   # ──────────────────────────────────────────────────────────
   shared_list <- shared_rxns_df %>%
-    group_by(abbr) %>%
-    summarize(rxns = list(reaction), .groups = "drop")
+    dplyr::group_by(abbr) %>%
+    dplyr::summarise(rxns = list(reaction), .groups = "drop")
 
   all_models <- shared_list$abbr
   joint_rxns <- unique(shared_rxns_df$reaction)
 
   reaction_orgs <- shared_rxns_df %>%
-    distinct(abbr, reaction) %>%
-    group_by(reaction) %>%
-    summarize(orgs = list(abbr), .groups = "drop")
+    dplyr::distinct(abbr, reaction) %>%
+    dplyr::group_by(reaction) %>%
+    dplyr::summarise(orgs = list(abbr), .groups = "drop")
 
   common_rxns <- reaction_orgs %>%
-    filter(map_lgl(orgs, ~ setequal(.x, all_models))) %>%
-    pull(reaction)
+    dplyr::filter(purrr::map_lgl(orgs, ~ setequal(.x, all_models))) %>%
+    dplyr::pull(reaction)
 
   exclusive_list <- shared_list %>%
-    mutate(excl = map(rxns, ~ setdiff(.x, common_rxns)))
+    dplyr::mutate(excl = purrr::map(rxns, ~ setdiff(.x, common_rxns)))
 
   message("✔ common reactions : ", length(common_rxns))
   message("✔ joint   reactions: ", length(joint_rxns))
@@ -99,17 +104,17 @@ project_boundary_reactions <- function(biounit_models,
   # ──────────────────────────────────────────────────────────
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-  write_lines(joint_rxns,
-              file.path(out_dir, "extracted_boundary_reactions.txt"))
+  readr::write_lines(joint_rxns,
+                     file.path(out_dir, "extracted_boundary_reactions.txt"))
 
   if (length(common_rxns) > 0)
-    write_lines(common_rxns,
-                file.path(out_dir, "common_reactions.txt"))
+    readr::write_lines(common_rxns,
+                       file.path(out_dir, "common_reactions.txt"))
 
-  walk2(
+  purrr::walk2(
     exclusive_list$excl, exclusive_list$abbr,
     ~ if (length(.x) > 0)
-        write_lines(.x,
+        readr::write_lines(.x,
           file.path(out_dir,
                     sprintf("exclusive_reactions_%s.txt", .y)))
   )
@@ -119,12 +124,12 @@ project_boundary_reactions <- function(biounit_models,
                   lower_bound = lowbnd, upper_bound = uppbnd) %>%
     dplyr::distinct()
 
-  write_csv(bounds_tbl,
-            file.path(out_dir, "reaction_bounds.csv"))
+  readr::write_csv(bounds_tbl,
+                   file.path(out_dir, "reaction_bounds.csv"))
 
   bounds_tbl %>%
-    group_by(organism) %>%
-    group_walk(~ write_csv(
+    dplyr::group_by(organism) %>%
+    dplyr::group_walk(~ readr::write_csv(
       .x,
       file.path(out_dir, sprintf("per_bounds_%s.csv", .y$organism))))
 
@@ -135,51 +140,53 @@ project_boundary_reactions <- function(biounit_models,
 
   models_df %>%
     dplyr::select(abbr, reactions) %>%
-    unnest(reactions) %>%
-    group_by(abbr) %>%
-    group_walk(~ {
+    tidyr::unnest(reactions) %>%
+    dplyr::group_by(abbr) %>%
+    dplyr::group_walk(~ {
       irr_net <- .x %>%
-        mutate(
+        dplyr::mutate(
           is_reversible = lowbnd < 0 & uppbnd > 0,
-          forward_reaction = if_else(is_reversible,
-                                     paste0(abbreviation, "_f"),
-                                     abbreviation),
-          reverse_reaction = if_else(is_reversible,
-                                     paste0(abbreviation, "_r"),
-                                     NA_character_),
-          lb_f = if_else(is_reversible, 0, pmax(0, lowbnd)),
-          ub_f = if_else(is_reversible, uppbnd, uppbnd),
-          lb_r = if_else(is_reversible, 0, NA_real_),
-          ub_r = if_else(is_reversible, -lowbnd, NA_real_)
+          forward_reaction = dplyr::if_else(is_reversible,
+                                            paste0(abbreviation, "_f"),
+                                            abbreviation),
+          reverse_reaction = dplyr::if_else(is_reversible,
+                                            paste0(abbreviation, "_r"),
+                                            NA_character_),
+          lb_f = dplyr::if_else(is_reversible, 0, pmax(0, lowbnd)),
+          ub_f = dplyr::if_else(is_reversible, uppbnd, uppbnd),
+          lb_r = dplyr::if_else(is_reversible, 0, NA_real_),
+          ub_r = dplyr::if_else(is_reversible, -lowbnd, NA_real_)
         ) %>%
         dplyr::select(original_reaction = abbreviation,
                       forward_reaction, lb_f, ub_f,
                       reverse_reaction, lb_r, ub_r)
 
       irr_long <- irr_net %>%
-        pivot_longer(cols = c(forward_reaction, reverse_reaction),
-                     names_to = "direction",
-                     values_to = "reaction") %>%
-        filter(!is.na(reaction)) %>%
-        mutate(
-          lb = if_else(direction == "forward_reaction", lb_f, lb_r),
-          ub = if_else(direction == "forward_reaction", ub_f, ub_r)
+        tidyr::pivot_longer(
+          cols      = c(forward_reaction, reverse_reaction),
+          names_to  = "direction",
+          values_to = "reaction") %>%
+        dplyr::filter(!is.na(reaction)) %>%
+        dplyr::mutate(
+          lb = dplyr::if_else(direction == "forward_reaction", lb_f, lb_r),
+          ub = dplyr::if_else(direction == "forward_reaction", ub_f, ub_r)
         ) %>%
         dplyr::select(reaction, lb, ub)
 
       irr_out <- file.path(out_dir,
                            sprintf("irreversible_reactions_%s.csv",
                                    unique(.y$abbr)))
-      write_csv(irr_long, irr_out)
-      cat(sprintf("  ✓ irreversible saved for %s: %s\n",
-                  unique(.y$abbr), irr_out))
+      readr::write_csv(irr_long, irr_out)
+      cat(sprintf("  ✓ irreversible saved for %s\n",
+                  unique(.y$abbr)))
     })
 
   invisible(list(
-    shared_reactions    = set_names(shared_list$rxns, shared_list$abbr),
+    shared_reactions    = purrr::set_names(shared_list$rxns,
+                                           shared_list$abbr),
     common_reactions    = common_rxns,
-    exclusive_reactions = set_names(exclusive_list$excl,
-                                    exclusive_list$abbr),
+    exclusive_reactions = purrr::set_names(exclusive_list$excl,
+                                           exclusive_list$abbr),
     bounds              = bounds_tbl
   ))
 }
