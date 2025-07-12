@@ -1,7 +1,3 @@
-#' @importFrom purrr map_chr map map_lgl walk2 set_names
-#' @importFrom tidyr unnest pivot_longer
-#' @importFrom tibble tibble
-#' @importFrom readr read_csv write_csv write_lines
 #' 
 #' @export
 #' 
@@ -76,12 +72,6 @@ project_boundary_reactions <- function(biounit_models,
     dplyr::select(reaction, organism = abbr, lower_bound = lowbnd, upper_bound = uppbnd) %>%
     dplyr::distinct()
     
-   bounds_tbl <- bounds_tbl %>% 
-			mutate(
-				lower_bound = as.numeric(unlist(lower_bound)),
-				upper_bound = as.numeric(unlist(upper_bound))
-  	)
-
   
   write_csv(bounds_tbl, file.path(out_dir, "reaction_bounds.csv"))
   
