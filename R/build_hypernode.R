@@ -153,13 +153,34 @@ build_hypernode <- function(hypernode_name,
   if (!is.null(cfg$exchange_bounds))
     private_adjust_bounds(cfg, biounit_models, hyper_root, cfg$volume)
 
-  # 7) Emit C++ / R helpers -------------------------------------------
-  epimodFBAfunctions::generate_cpp_from_arcs(fs::path(paths$output, "repaired_arcs.csv"), tmpl_cpp,
-                                            fs::path(paths$src, paste0("general_functions_", hypernode_name, ".cpp")),
-                                            cfg$volume, cfg$cell_density)
+	# 7) Emit C++ / R helpers -------------------------------------------
 
-  epimodFBAfunctions::generate_R_from_pnpro(repaired_pn, tmpl_R, biounit_models,
-                                           fs::path(paths$src, paste0("functions_", hypernode_name, ".R")))
+	## ── resolve template files **inside the installed package** ─────────
+	##    (mirrors how we located blank.PNPRO above)
+	tmpl_cpp <- system.file("templates", "general_functions_template.cpp",
+		                      package = "epimodFBAfunctions")
+	tmpl_R   <- system.file("templates", "functions_hypernode_template.R",
+		                      package = "epimodFBAfunctions")
+
+	if (tmpl_cpp == "" || tmpl_R == "")
+		stop("Template files not found inside package ‘epimodFBAfunctions’")
+
+	## ── generate helper files ───────────────────────────────────────────
+	epimodFBAfunctions::generate_cpp_from_arcs(
+		fs::path(paths$output, "repaired_arcs.csv"),
+		tmpl_cpp,
+		fs::path(paths$src, paste0("general_functions_", hypernode_name, ".cpp")),
+		cfg$volume,
+		cfg$cell_density
+	)
+
+	epimodFBAfunctions::generate_R_from_pnpro(
+		repaired_pn,
+		tmpl_R,
+		biounit_models,
+		fs::path(paths$src, paste0("functions_", hypernode_name, ".R"))
+	)
+
 
   # 8) epimod model generation + analysis -----------------------------
   fba_files <- vapply(biounit_models, function(m)
