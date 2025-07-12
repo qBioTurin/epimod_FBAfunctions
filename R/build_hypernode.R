@@ -197,7 +197,7 @@ build_hypernode <- function(hypernode_name,
   })
 
   epimod::model.analysis(solver_fname     = fs::path(paths$gen, paste0(hypernode_name, ".solver")),
-                         parameters_fname = fs::path(paths$config, "initial_data.csv"),
+                         parameters_fname = fs::path(paths$config, fs::path_file("initial_data.csv")),
                          functions_fname  = fs::path(paths$src, paste0("functions_", hypernode_name, ".R")),
                          debug = debug, i_time = 0, f_time = 10, s_time = 1, atol = 1e-6, rtol = 1e-6,
                          fba_fname = fba_files,
