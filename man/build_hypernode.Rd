@@ -15,44 +15,56 @@ build_hypernode(
 )
 }
 \arguments{
-\item{hypernode_name}{Character. Logical name for the run (no ext).}
+\item{hypernode_name}{Character.  Label for the run (no extension).}
 
-\item{config_yaml}{Path to \emph{config_\if{html}{\out{<name>}}.yaml}.}
+\item{config_yaml}{Path to the YAML file.}
 
-\item{pnpro_template}{PNPRO skeleton.  File name alone is looked up
-inside \emph{inst/petri_nets_library/} of the package.}
+\item{pnpro_template}{Path to a PNPRO skeleton.  If just a filename it
+is searched in the package’s \verb{extdata/} folder.}
 
-\item{mat_dir}{Directory where the user dropped custom *.mat
-models (default "models").}
+\item{mat_dir}{Folder containing user \emph{.mat} files (default "models").}
 
-\item{base_dir}{Working directory (default = \code{getwd()}).}
+\item{base_dir}{Root working directory (default = \code{getwd()}).}
 
-\item{overwrite}{Logical. Remove/replace existing outputs? (FALSE)}
+\item{overwrite}{Logical.  Delete any previous run with the same
+name before rebuilding (FALSE).}
 
 \item{debug}{Passed to \code{epimod::model.analysis()}.}
 }
 \value{
-Invisibly a list of created sub‑paths.
+(Invisibly) a list of created sub‑paths.
 }
 \description{
-A single entry‑point that recreates the full \emph{minimal‑doublet} workflow
-for any community. The user only needs to supply:
+One function = the whole workflow.  It reproduces the original
+\emph{minimal‑doublet} demo but works for any community size and lets the
+user mix built‑in and custom \emph{.mat} models.
 }
 \details{
+Required user files \emph{only}:
+• a \strong{YAML} configuration (\code{config_yaml})
+• a PNPRO \strong{template} (\code{pnpro_template})
+• any custom \emph{.mat} files (placed in \code{mat_dir})
+
+Everything else (templates, built‑in MAT models, lookup tables…) is
+retrieved with \code{system.file()}.
+
+Paths resolved:
 \itemize{
-\item a \strong{PNPRO template} (e.g. \code{blank.PNPRO})
-\item a \strong{YAML configuration} in the format already used by the demos
-\item optional *\emph{custom \emph{.mat}} files placed in a folder you point to
-}
-
-The function looks for \code{.mat} models in four places \strong{in order}:
+\item PNPRO template
 \enumerate{
-\item If \code{model_name} in the YAML \strong{already ends in \code{.mat}} and exists → use as‑is.
-\item \code{mat_dir} (default "models/") – user‑supplied models for this project.
-\item \verb{system.file("MATmodels", …, package = "epimodFBAfunctions")} –
-the built‑ins shipped with the package.
-\item Error if not found.
+\item absolute / relative path as given
+\item \verb{inst/extdata/<file>} shipped with the package
+}
+\item MAT models
+\enumerate{
+\item explicit path ending in \code{.mat}
+\item \verb{<mat_dir>/<name>.mat}
+\item \verb{inst/MATmodels/<name>.mat}
+}
 }
 
-All generated artefacts live in \verb{base_dir/hypernodes/<hypernode_name>/}.
+All artefacts are written to:
+\verb{<base_dir>/hypernodes/<hypernode_name>/}
+and the generated PNPRO is saved to
+\verb{<base_dir>/petri_nets_library/<hypernode_name>.PNPRO}.
 }

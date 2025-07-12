@@ -1,31 +1,41 @@
 #' Build and analyse a hyper‑node automatically
 #'
-#' A single entry‑point that recreates the full *minimal‑doublet* workflow
-#' for any community. The user only needs to supply:
+#' One function = the whole workflow.  It reproduces the original
+#' *minimal‑doublet* demo but works for any community size and lets the
+#' user mix built‑in and custom *.mat* models.
 #'
-#' * a **PNPRO template** (e.g. `blank.PNPRO`)
-#' * a **YAML configuration** in the format already used by the demos
-#' * optional **custom *.mat** files placed in a folder you point to
+#' Required user files *only*:
+#'   • a **YAML** configuration (`config_yaml`)
+#'   • a PNPRO **template** (`pnpro_template`)
+#'   • any custom *.mat* files (placed in `mat_dir`)
 #'
-#' The function looks for `.mat` models in four places **in order**:
-#' 1. If `model_name` in the YAML **already ends in `.mat`** and exists → use as‑is.
-#' 2. `mat_dir` (default "models/") – user‑supplied models for this project.
-#' 3. `system.file("MATmodels", …, package = "epimodFBAfunctions")` –
-#'    the built‑ins shipped with the package.
-#' 4. Error if not found.
+#' Everything else (templates, built‑in MAT models, lookup tables…) is
+#' retrieved with `system.file()`.
 #'
-#' All generated artefacts live in `base_dir/hypernodes/<hypernode_name>/`.
+#' Paths resolved:
+#'   * PNPRO template
+#'       1. absolute / relative path as given
+#'       2. `inst/extdata/<file>` shipped with the package
+#'   * MAT models
+#'       1. explicit path ending in `.mat`
+#'       2. `<mat_dir>/<name>.mat`
+#'       3. `inst/MATmodels/<name>.mat`
 #'
-#' @param hypernode_name  Character. Logical name for the run (no ext).
-#' @param config_yaml     Path to *config_<name>.yaml*.
-#' @param pnpro_template  PNPRO skeleton.  File name alone is looked up
-#'                        inside *inst/petri_nets_library/* of the package.
-#' @param mat_dir         Directory where the user dropped custom *.mat
-#'                        models (default "models").
-#' @param base_dir        Working directory (default = `getwd()`).
-#' @param overwrite       Logical. Remove/replace existing outputs? (FALSE)
-#' @param debug           Passed to `epimod::model.analysis()`.
-#' @return Invisibly a list of created sub‑paths.
+#' All artefacts are written to:
+#'   `<base_dir>/hypernodes/<hypernode_name>/`
+#' and the generated PNPRO is saved to
+#'   `<base_dir>/petri_nets_library/<hypernode_name>.PNPRO`.
+#'
+#' @param hypernode_name Character.  Label for the run (no extension).
+#' @param config_yaml    Path to the YAML file.
+#' @param pnpro_template Path to a PNPRO skeleton.  If just a filename it
+#'                       is searched in the package’s `extdata/` folder.
+#' @param mat_dir        Folder containing user *.mat* files (default "models").
+#' @param base_dir       Root working directory (default = `getwd()`).
+#' @param overwrite      Logical.  Delete any previous run with the same
+#'                       name before rebuilding (FALSE).
+#' @param debug          Passed to `epimod::model.analysis()`.
+#' @return (Invisibly) a list of created sub‑paths.
 #' @export
 build_hypernode <- function(hypernode_name,
                             config_yaml,
@@ -34,28 +44,29 @@ build_hypernode <- function(hypernode_name,
                             base_dir       = getwd(),
                             overwrite      = FALSE,
                             debug          = FALSE) {
+  # helper -------------------------------------------------------------
+  abs_path <- function(x) fs::path_abs(fs::path_expand(x))
 
-  # ------------------------------------------------------------
-  # 0)   Resolve templates shipped in inst/ ---------------------
-  # ------------------------------------------------------------
-  if (!fs::is_absolute_path(pnpro_template)) {
-    pnpro_template <- system.file("petri_nets_library", pnpro_template,
+  # 0)  Resolve PNPRO template ----------------------------------------
+  if (!fs::file_exists(pnpro_template)) {
+    # File name only? look up in inst/extdata/
+    pnpro_template <- system.file("extdata", pnpro_template,
                                   package = "epimodFBAfunctions")
   }
   if (pnpro_template == "")
     stop("PNPRO template not found: ", pnpro_template)
+  pnpro_template <- abs_path(pnpro_template)
 
   tmpl_cpp <- system.file("templates", "general_functions_template.cpp",
                           package = "epimodFBAfunctions")
   tmpl_R   <- system.file("templates", "functions_hypernode_template.R",
                           package = "epimodFBAfunctions")
 
-  # ------------------------------------------------------------
-  # 1)   Create directory tree ---------------------------------
-  # ------------------------------------------------------------
+  # 1) Directory scaffold ---------------------------------------------
   hyper_root <- fs::path(base_dir, "hypernodes", hypernode_name)
   if (fs::dir_exists(hyper_root) && !overwrite)
-    stop("Folder already exists. Set overwrite = TRUE to rebuild: ", hyper_root)
+    stop("Run already exists, set overwrite = TRUE: ", hyper_root)
+  fs::dir_delete(hyper_root, recurse = TRUE) # safely wipe if overwrite
   fs::dir_create(hyper_root, recurse = TRUE)
 
   paths <- list(
@@ -67,115 +78,78 @@ build_hypernode <- function(hypernode_name,
   )
   purrr::walk(paths, fs::dir_create, recurse = TRUE)
 
-  # copy YAML next to the run for provenance
+  # local petri_nets_library (mirrors old script)
+  petri_lib <- fs::path(base_dir, "petri_nets_library")
+  fs::dir_create(petri_lib)
+
+  # 2) Load YAML (+ optional JSON) ------------------------------------
   fs::file_copy(config_yaml, paths$config, overwrite = TRUE)
   cfg_path <- fs::path(paths$config, fs::path_file(config_yaml))
   cfg      <- yaml::read_yaml(cfg_path)
 
-  # ------------------------------------------------------------
-  # 2)   Resolve *.mat files -----------------------------------
-  # ------------------------------------------------------------
+  if (!is.null(cfg$boundary_conditions_file)) {
+    bc_file <- cfg$boundary_conditions_file
+    if (!fs::is_absolute_path(bc_file))
+      bc_file <- fs::path(dirname(cfg_path), bc_file)   # resolve relative
+    if (!fs::file_exists(bc_file))
+      stop("boundary_conditions_file not found: ", bc_file)
+    bc_json <- jsonlite::fromJSON(bc_file, simplifyVector = TRUE)
+    cfg <- utils::modifyList(cfg, bc_json)
+  }
+
+  # 3) Resolve *.mat ---------------------------------------------------
   find_mat <- function(name) {
-    # a) explicit path?
     if (grepl("\\.mat$", name, ignore.case = TRUE) && fs::file_exists(name))
-      return(fs::path_abs(name))
-    # b) user project folder
+      return(abs_path(name))
     user_path <- fs::path(mat_dir, paste0(name, ".mat"))
     if (fs::file_exists(user_path))
-      return(fs::path_abs(user_path))
-    # c) package built‑ins
+      return(abs_path(user_path))
     pkg_path <- system.file("MATmodels", paste0(name, ".mat"),
                             package = "epimodFBAfunctions")
     if (pkg_path != "") return(pkg_path)
-    stop("MAT model not found (searched mat_dir & package): ", name)
+    stop("MAT model not found: ", name)
   }
 
   model_names <- vapply(cfg$cellular_units, `[[`, character(1), "model_name")
   mat_paths   <- vapply(model_names, find_mat, character(1))
-
-  # collect param vectors
   biomass_params <- lapply(cfg$cellular_units, `[[`, "biomass")
   pop_params     <- lapply(cfg$cellular_units, `[[`, "population")
   init_counts    <- as.numeric(vapply(cfg$cellular_units, `[[`, character(1), "initial_count"))
 
-  # ------------------------------------------------------------
-  # 3)   Build biounit models + write population parameters -----
-  # ------------------------------------------------------------
+  # 4) Build & process models -----------------------------------------
   message("▶ building biounit models …")
-  biounit_models <- epimodFBAfunctions::make_biounit_models(
-    mat_paths, biomass_params, pop_params, init_counts)
+  biounit_models <- epimodFBAfunctions::make_biounit_models(mat_paths, biomass_params, pop_params, init_counts)
+  epimodFBAfunctions::write_population_params(biounit_models, fs::path(paths$config, "population_parameters.csv"))
+  purrr::walk(biounit_models, ~epimodFBAfunctions::process_model(.x, hypernode_name))
 
-  epimodFBAfunctions::write_population_params(
-    biounit_models,
-    fs::path(paths$config, "population_parameters.csv"))
+  # 5) Boundary projection + PN repair --------------------------------
+  epimodFBAfunctions::project_boundary_reactions(biounit_models, cfg$boundary_metabolites, paths$output, hypernode_name)
 
-  # ------------------------------------------------------------
-  # 4)   Process models, project boundaries, validate PN --------
-  # ------------------------------------------------------------
-  message("▶ processing models …")
-  purrr::walk(biounit_models, function(m)
-    epimodFBAfunctions::process_model(m, hypernode_name))
+  epimodFBAfunctions::validate_pnpro(pnpro_template, hyper_root, biounit_models, cfg$boundary_metabolites, paths$output, hypernode_name)
 
-  message("▶ projecting boundary reactions …")
-  epimodFBAfunctions::project_boundary_reactions(
-    biounit_models      = biounit_models,
-    boundary_metabolites= cfg$boundary_metabolites,
-    out_dir             = paths$output,
-    hypernode_name      = hypernode_name)
+  repaired_pn <- fs::path(petri_lib, paste0(hypernode_name, ".PNPRO"))
+  epimodFBAfunctions::generate_pnpro(readr::read_csv(fs::path(paths$output, "repaired_arcs.csv"), show_col_types = FALSE), repaired_pn)
 
-  epimodFBAfunctions::validate_pnpro(
-    pnpro2validate    = pnpro_template,
-    hypernode_root    = hyper_root,
-    biounit_models    = biounit_models,
-    boundary_metabolites = cfg$boundary_metabolites,
-    out_dir           = paths$output,
-    hypernode_name    = hypernode_name)
-
-  epimodFBAfunctions::generate_pnpro(
-    arc_df   = readr::read_csv(fs::path(paths$output, "repaired_arcs.csv"), show_col_types = FALSE),
-    pnpro_out= fs::path(paths$biounit, "..", "..", "petri_nets_library", paste0(hypernode_name, ".PNPRO")))
-
-  # ------------------------------------------------------------
-  # 5)   Exchange bounds (default + diet) ----------------------
-  # ------------------------------------------------------------
-  message("▶ computing exchange bounds …")
-  epimodFBAfunctions::run_full_ex_bounds(
-    hypernode_name        = hypernode_name,
-    biounit_models        = biounit_models,
-    projected_base_ub     = cfg$fba_upper_bound,
-    projected_base_lb     = cfg$fba_lower_bound,
-    not_projected_base_lb = cfg$background_met * cfg$volume,
-    not_projected_base_ub = 1000)
-
+  # 6) Exchange bounds -------------------------------------------------
+  epimodFBAfunctions::run_full_ex_bounds(hypernode_name, biounit_models, cfg$fba_upper_bound, cfg$fba_lower_bound, cfg$background_met * cfg$volume, 1000)
   if (!is.null(cfg$exchange_bounds))
     private_adjust_bounds(cfg, biounit_models, hyper_root, cfg$volume)
 
-  # ------------------------------------------------------------
-  # 6)   Generate source from templates ------------------------
-  # ------------------------------------------------------------
-  epimodFBAfunctions::generate_cpp_from_arcs(
-    arcs_csv     = fs::path(paths$output, "repaired_arcs.csv"),
-    cpp_template = tmpl_cpp,
-    output_cpp   = fs::path(paths$src, paste0("general_functions_", hypernode_name, ".cpp")),
-    volume       = cfg$volume,
-    cell_density = cfg$cell_density)
+  # 7) Emit C++ / R helpers -------------------------------------------
+  epimodFBAfunctions::generate_cpp_from_arcs(fs::path(paths$output, "repaired_arcs.csv"), tmpl_cpp,
+                                            fs::path(paths$src, paste0("general_functions_", hypernode_name, ".cpp")),
+                                            cfg$volume, cfg$cell_density)
 
-  epimodFBAfunctions::generate_R_from_pnpro(
-    pnpro_file = fs::path(paths$biounit, "..", "..", "petri_nets_library", paste0(hypernode_name, ".PNPRO")),
-    r_template = tmpl_R,
-    biounit_models = biounit_models,
-    output_r   = fs::path(paths$src, paste0("functions_", hypernode_name, ".R")))
+  epimodFBAfunctions::generate_R_from_pnpro(repaired_pn, tmpl_R, biounit_models,
+                                           fs::path(paths$src, paste0("functions_", hypernode_name, ".R")))
 
-  # ------------------------------------------------------------
-  # 7)   epimod generation & analysis --------------------------
-  # ------------------------------------------------------------
+  # 8) epimod model generation + analysis -----------------------------
   fba_files <- vapply(biounit_models, function(m)
     fs::path(hyper_root, "biounits", m$FBAmodel, m$txt_file), character(1))
 
-  epimod::model.generation(
-    net_fname        = fs::path(paths$biounit, "..", "..", "petri_nets_library", paste0(hypernode_name, ".PNPRO")),
-    transitions_fname= fs::path(paths$src, paste0("general_functions_", hypernode_name, ".cpp")),
-    fba_fname        = fba_files)
+  epimod::model.generation(net_fname = repaired_pn,
+                           transitions_fname = fs::path(paths$src, paste0("general_functions_", hypernode_name, ".cpp")),
+                           fba_fname = fba_files)
 
   fs::dir_create(paths$gen)
   purrr::walk(c(".solver", ".def", ".fbainfo", ".net", ".PlaceTransition"), function(ext) {
@@ -183,22 +157,18 @@ build_hypernode <- function(hypernode_name,
     if (fs::file_exists(src)) fs::file_move(src, paths$gen)
   })
 
-  epimod::model.analysis(
-    solver_fname     = fs::path(paths$gen, paste0(hypernode_name, ".solver")),
-    parameters_fname = fs::path(paths$config, "initial_data.csv"),
-    functions_fname  = fs::path(paths$src, paste0("functions_", hypernode_name, ".R")),
-    debug            = debug,
-    i_time = 0, f_time = 10, s_time = 1, atol = 1e-6, rtol = 1e-6,
-    fba_fname        = fba_files,
-    user_files       = c(
-      fs::path(paths$config, "population_parameters.csv"),
-      fs::path(paths$gen, paste0(hypernode_name, ".fbainfo")),
-      fs::path(paths$output, "ub_bounds_projected.csv"),
-      fs::path(paths$output, "ub_bounds_not_projected.csv")))
+  epimod::model.analysis(solver_fname     = fs::path(paths$gen, paste0(hypernode_name, ".solver")),
+                         parameters_fname = fs::path(paths$config, "initial_data.csv"),
+                         functions_fname  = fs::path(paths$src, paste0("functions_", hypernode_name, ".R")),
+                         debug = debug, i_time = 0, f_time = 10, s_time = 1, atol = 1e-6, rtol = 1e-6,
+                         fba_fname = fba_files,
+                         user_files = c(fs::path(paths$config, "population_parameters.csv"),
+                                        fs::path(paths$gen, paste0(hypernode_name, ".fbainfo")),
+                                        fs::path(paths$output, "ub_bounds_projected.csv"),
+                                        fs::path(paths$output, "ub_bounds_not_projected.csv")))
 
   invisible(paths)
 }
-
 # ---------------------------------------------------------------------
 # internal helper: diet‑based bound adjustment -------------------------
 # ---------------------------------------------------------------------
