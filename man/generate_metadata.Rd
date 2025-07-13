@@ -9,7 +9,8 @@ generate_metadata(
   output_dir = mat_dir,
   biomass = list(max = 1, mean = 1, min = 0),
   overwrite = FALSE,
-  quiet = FALSE
+  quiet = FALSE,
+  progress = NULL
 )
 }
 \arguments{

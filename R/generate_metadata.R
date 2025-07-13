@@ -37,7 +37,8 @@ generate_metadata <- function(mat_dir,
                               output_dir = mat_dir,
                               biomass    = list(max = 1, mean = 1, min = 0),
                               overwrite  = FALSE,
-                              quiet      = FALSE) {
+                              quiet      = FALSE,
+                              progress   = NULL) {
   stopifnot(dir.exists(mat_dir))
 
   mat_files <- list.files(mat_dir, pattern = "\\.mat$", full.names = TRUE)
@@ -47,7 +48,10 @@ generate_metadata <- function(mat_dir,
 
   say <- function(...) if (!quiet) message(...)
 
-  res <- purrr::map_dfr(mat_files, function(mat_path) {
+  res <- purrr::map_dfr(seq_along(mat_files), function(idx) {
+    mat_path <- mat_files[idx]
+    if (!is.null(progress)) progress(idx, length(mat_files))
+
     model_name <- tools::file_path_sans_ext(basename(mat_path))
     model_dir  <- fs::path(output_dir, model_name)
 
@@ -90,19 +94,31 @@ generate_metadata <- function(mat_dir,
       dest_dir  = paste0(model_dir, .Platform$file.sep)  # keep trailing /
     )
 
+    # 3) extract boundary metabolites --------------------------------------
+    meta_path <- fs::path(model_dir, "metabolites_metadata.csv")
+    boundary_ok <- FALSE
+    if (fs::file_exists(meta_path)) {
+      meta_df <- readr::read_csv(meta_path, show_col_types = FALSE)
+      boundary_df <- dplyr::filter(meta_df, .data$is_boundary)
+      readr::write_csv(boundary_df, fs::path(model_dir, "boundary_metabolites.csv"))
+      boundary_ok <- nrow(boundary_df) > 0
+    }
+
     meta_ok <- all(
-      fs::file_exists(fs::path(model_dir, "metabolites_metadata.csv")),
+      fs::file_exists(meta_path),
       fs::file_exists(fs::path(model_dir, "reactions_metadata.csv"))
     )
 
     tibble::tibble(
-      model      = model_name,
-      directory  = model_dir,
-      txt_file   = fs::path(model_dir, paste0(fba_base, ".txt")),
-      meta_ready = meta_ok
+      model          = model_name,
+      directory      = model_dir,
+      txt_file       = fs::path(model_dir, paste0(fba_base, ".txt")),
+      meta_ready     = meta_ok,
+      boundary_ready = boundary_ok
     )
   })
 
   invisible(res)
 }
+
 
