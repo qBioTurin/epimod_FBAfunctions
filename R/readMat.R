@@ -7,17 +7,24 @@
 #'
 FBAmat.read = function(fba_mat, input_dir){
   
-  # convert .mat → .json if needed
+  # define JSON path
   json_path <- sub("\\.mat$", ".json", fba_mat)
+
+  # if it needs to be generated, do so...
   if (!file.exists(json_path)) {
     py <- system.file("python","test.py", package="epimodFBAfunctions")
     if (py == "") stop("Cannot find mat2json.py in inst/python")
-    cmd <- c(py, fba_mat, json_path)
-    status <- system2("python3", args = cmd, stdout = TRUE, stderr = TRUE)
+    status <- system2("python3", args = c(py, fba_mat, json_path),
+                      stdout = TRUE, stderr = TRUE)
     if (attr(status,"status") %||% 0 != 0) {
-      stop("Error converting MAT→JSON:\n", paste(status, collapse = "\n"))
+      stop("Error converting MAT→JSON:\n", paste(status, collapse="\n"))
     }
   }
+
+  # schedule the JSON for deletion on exit
+  on.exit({
+    if (file.exists(json_path)) file.remove(json_path)
+  }, add = TRUE)
 
   # ─── benchmark the JSON load ───────────────────────────────
   timing <- system.time({
@@ -25,6 +32,7 @@ FBAmat.read = function(fba_mat, input_dir){
     mod.var  <- names(dat.mat)
   })
   message(sprintf("⏱ read JSON model: %.3f s", timing["elapsed"]))
+
   
   # 1) model name
   if( "modelID" %in% mod.var ){
