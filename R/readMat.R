@@ -7,12 +7,24 @@
 #'
 FBAmat.read = function(fba_mat, input_dir){
   
-  # ─── benchmark the MAT‐loading and initial extract ───
-timing <- system.time({
-  dat.mat <- read_cobra_mat(fba_mat)
-  mod.var <- names(dat.mat)
-})
-message(sprintf("⏱ read_cobra_mat: %.3f s", timing["elapsed"]))
+  # convert .mat → .json if needed
+  json_path <- sub("\\.mat$", ".json", fba_mat)
+  if (!file.exists(json_path)) {
+    py <- system.file("python","test.py", package="epimodFBAfunctions")
+    if (py == "") stop("Cannot find mat2json.py in inst/python")
+    cmd <- c(py, fba_mat, json_path)
+    status <- system2("python3", args = cmd, stdout = TRUE, stderr = TRUE)
+    if (attr(status,"status") %||% 0 != 0) {
+      stop("Error converting MAT→JSON:\n", paste(status, collapse = "\n"))
+    }
+  }
+
+  # ─── benchmark the JSON load ───────────────────────────────
+  timing <- system.time({
+    dat.mat <- read_model_json(json_path)
+    mod.var  <- names(dat.mat)
+  })
+  message(sprintf("⏱ read JSON model: %.3f s", timing["elapsed"]))
   
   # 1) model name
   if( "modelID" %in% mod.var ){
