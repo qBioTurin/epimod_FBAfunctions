@@ -10,6 +10,17 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// read_cobra_mat
+List read_cobra_mat(std::string path);
+RcppExport SEXP _epimodFBAfunctions_read_cobra_mat(SEXP pathSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type path(pathSEXP);
+    rcpp_result_gen = Rcpp::wrap(read_cobra_mat(path));
+    return rcpp_result_gen;
+END_RCPP
+}
 // writeModelCpp
 void writeModelCpp(NumericMatrix S, CharacterVector react_id, CharacterVector met_id, NumericVector obj_coef, NumericVector lowbnd, NumericVector uppbnd, NumericVector rb, NumericVector gene_assoc, std::string model_name, bool write, std::string wd, double bioMax, double bioMean, double bioMin, int pFBAFlag);
 RcppExport SEXP _epimodFBAfunctions_writeModelCpp(SEXP SSEXP, SEXP react_idSEXP, SEXP met_idSEXP, SEXP obj_coefSEXP, SEXP lowbndSEXP, SEXP uppbndSEXP, SEXP rbSEXP, SEXP gene_assocSEXP, SEXP model_nameSEXP, SEXP writeSEXP, SEXP wdSEXP, SEXP bioMaxSEXP, SEXP bioMeanSEXP, SEXP bioMinSEXP, SEXP pFBAFlagSEXP) {
@@ -36,6 +47,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_epimodFBAfunctions_read_cobra_mat", (DL_FUNC) &_epimodFBAfunctions_read_cobra_mat, 1},
     {"_epimodFBAfunctions_writeModelCpp", (DL_FUNC) &_epimodFBAfunctions_writeModelCpp, 15},
     {NULL, NULL, 0}
 };
