@@ -7,10 +7,17 @@
 #'
 FBAmat.read = function(fba_mat, input_dir){
   
-  data = R.matlab::readMat(fba_mat)
-  dat.mat = data[[1]]
-  
-  mod.var = dimnames(dat.mat)[[1]]
+  # ─── benchmark the MAT‐loading and initial extract ───
+  timing <- system.time({
+    data    <- R.matlab::readMat(fba_mat)
+    dat.mat <- data[[1]]
+    mod.var <- dimnames(dat.mat)[[1]]
+  })
+  message(sprintf(
+    "⏱  readMat + dat.mat extract: %.3f sec elapsed",
+    timing["elapsed"]
+  ))
+
   
   # 1) model name
   if( "modelID" %in% mod.var ){

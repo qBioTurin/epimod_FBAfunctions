@@ -41,9 +41,10 @@ Imports:
     sensobol,
     magrittr,
     methods
-LinkingTo: 
-    Rcpp
-SystemRequirements: C++11
+LinkingTo:
+	Rcpp,
+SystemRequirements: 
+	C++11, 
 Suggested:
     devtools,
     pkgload,
