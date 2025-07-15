@@ -80,8 +80,9 @@ build_hypernodeGUI <- function(hypernode_name,
   purrr::walk(paths, fs::dir_create, recurse = TRUE)
 
   # local petri_nets_library (mirrors old script)
-  petri_lib <- fs::path(base_dir, "petri_nets_library")
+  petri_lib <- fs::path(hyper_root, "petri_net")
   fs::dir_create(petri_lib)
+
 
   # 2) Load YAML (+ optional JSON) ------------------------------------
   fs::file_copy(initial_data, paths$config, overwrite = TRUE)
@@ -117,25 +118,38 @@ build_hypernodeGUI <- function(hypernode_name,
     stop("MAT model not found: ", name)
   }
 
-  model_names <- vapply(cfg$cellular_units, `[[`, character(1), "model_name")
-  mat_paths   <- vapply(model_names, find_mat, character(1))
-  biomass_params <- lapply(cfg$cellular_units, `[[`, "biomass")
-  pop_params     <- lapply(cfg$cellular_units, `[[`, "population")
-  init_counts    <- as.numeric(vapply(cfg$cellular_units, `[[`, character(1), "initial_count"))
+  model_names <- vapply(
+    cfg$cellular_units,
+    function(u) as.character(u[["model_name"]]),
+    character(1)
+  )
+  mat_paths     <- vapply(model_names, find_mat, character(1))
+  biomass_params<- lapply(cfg$cellular_units, `[[`, "biomass")
+  pop_params    <- lapply(cfg$cellular_units, `[[`, "population")
+  # — coerce to numeric
+  init_counts <- vapply(
+    cfg$cellular_units,
+    function(u) as.numeric(u[["initial_count"]]),
+    numeric(1)
+  )
+
 
   # 4) Build & process models -----------------------------------------
   message("▶ building biounit models …")
   biounit_models <- epimodFBAfunctions::make_biounit_models(mat_paths, biomass_params, pop_params, init_counts)
   epimodFBAfunctions::write_population_params(biounit_models, fs::path(paths$config, "population_parameters.csv"))
   
-	purrr::walk(
-		biounit_models,
-		epimodFBAfunctions::process_model,
-		hypernode_name = hypernode_name,
-		mat_dir        = mat_dir,   
-		base_dir       = base_dir
-	)
+  message("▶ copying prebuilt biounits …")
+  fs::dir_create(paths$biounit, recurse = TRUE)  # now exists
+  prebuilt_dirs <- fs::dir_ls(mat_dir, type = "directory", recurse = FALSE)
+  for (src in prebuilt_dirs) {
+    model_name <- fs::path_file(src)
+    dest       <- fs::path(paths$biounit, model_name)
+    message("   • ", model_name)
+    fs::dir_copy(src, dest, overwrite = TRUE)
+  }
 
+  
   # 5) Boundary projection + PN repair --------------------------------
 	epimodFBAfunctions::project_boundary_reactions(
 		biounit_models       = biounit_models,
@@ -151,7 +165,9 @@ build_hypernodeGUI <- function(hypernode_name,
   epimodFBAfunctions::generate_pnpro(readr::read_csv(fs::path(paths$output, "repaired_arcs.csv"), show_col_types = FALSE), repaired_pn)
 
   # 6) Exchange bounds -------------------------------------------------
-  epimodFBAfunctions::run_full_ex_bounds(hypernode_name, biounit_models, cfg$fba_upper_bound, cfg$fba_lower_bound, cfg$background_met * cfg$volume, 1000)
+  epimodFBAfunctions::run_full_ex_bounds(hypernode_name, biounit_models, cfg$fba_upper_bound, cfg$fba_lower_bound, cfg$background_met * cfg$volume, 1000, base_dir = base_dir)
+
+
   if (!is.null(cfg$exchange_bounds))
     private_adjust_bounds(cfg, biounit_models, hyper_root, cfg$volume)
 
@@ -182,9 +198,6 @@ build_hypernodeGUI <- function(hypernode_name,
 		biounit_models,
 		fs::path(paths$src, paste0("functions_", hypernode_name, ".R"))
 	)
-
-
-  dir_delete(mat_dir)
   
   invisible(paths)
 }

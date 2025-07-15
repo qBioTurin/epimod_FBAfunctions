@@ -1,5 +1,5 @@
 # ============================================================
-#  File: ex_bounds_module.R        (path-handling fixes only)
+#  File: ex_bounds_module_fixed.R  (path-handling fixes applied)
 # ============================================================
 
 # strip directory + “.mat”, leaving the clean FBA-model folder name
@@ -8,6 +8,8 @@ model_dir <- function(path) {
 }
 
 # ------------------------------------------------------------
+# Expand and write bound adjustments for boundary reactions
+# Added base_dir argument and absolute paths for metadata
 process_boundary_reactions <- function(
     hypernode_name,
     biounit_models,
@@ -17,21 +19,27 @@ process_boundary_reactions <- function(
     projected_base_ub,
     not_projected_base_lb,
     not_projected_base_ub,
-    projected_reactions_df
+    projected_reactions_df,
+    base_dir = getwd()
 ) {
   ## ── 1) Load and expand boundary reactions ───────────────────────
   metadata_all <- do.call(rbind, lapply(biounit_models, function(model) {
-
-    meta_path <- file.path("hypernodes", hypernode_name, "biounits",
-                           model_dir(model$FBAmodel),   # ← fixed
-                           "reactions_metadata.csv")
-
+    model_name <- model_dir(model$FBAmodel)
+    # build absolute path to reactions metadata
+    meta_path <- fs::path(
+      base_dir,
+      "hypernodes", hypernode_name,
+      "biounits", model_name,
+      "reactions_metadata.csv"
+    )
+    if (!file.exists(meta_path)) {
+      stop("Missing reactions_metadata.csv at: ", meta_path)
+    }
     meta <- read.csv(meta_path, stringsAsFactors = FALSE)
-    meta$FBAmodel <- model_dir(model$FBAmodel)          # ← fixed
+    meta$FBAmodel <- model_name
     meta$txt_file <- model$txt_file
     meta
   }))
-
   metadata_all <- subset(metadata_all, type == "boundary")
 
   expanded <- do.call(rbind, lapply(seq_len(nrow(metadata_all)), function(i) {
@@ -74,15 +82,17 @@ process_boundary_reactions <- function(
     if (row$projected) {
       ub <- if (rxn_type == "r") abs(projected_base_lb) else projected_base_ub
       projected[[length(projected) + 1]] <-
-        data.frame(reaction = row$abbreviation,
-                   FBAmodel = row$FBAmodel,
-                   upper_bound = ub,
-                   stringsAsFactors = FALSE)
+        data.frame(
+          reaction    = row$abbreviation,
+          FBAmodel    = row$FBAmodel,
+          upper_bound = ub,
+          stringsAsFactors = FALSE
+        )
     } else {
       if (rxn_type == "r") {
         if (row$subtype == "exchange") {
           match_rows  <- expanded[expanded$abbreviation == row$abbreviation &
-                                    !expanded$projected, ]
+                                  !expanded$projected, ]
           orgs        <- unique(match_rows$FBAmodel)
           total_count <- sum(bacteria_counts[orgs])
           ub          <- abs(not_projected_base_lb / total_count)
@@ -95,22 +105,28 @@ process_boundary_reactions <- function(
       }
 
       non_projected[[length(non_projected) + 1]] <-
-        data.frame(reaction = row$abbreviation,
-                   FBAmodel = row$FBAmodel,
-                   upper_bound = ub,
-                   stringsAsFactors = FALSE)
+        data.frame(
+          reaction    = row$abbreviation,
+          FBAmodel    = row$FBAmodel,
+          upper_bound = ub,
+          stringsAsFactors = FALSE
+        )
     }
   }
 
   df_proj    <- if (length(projected))     do.call(rbind, projected)     else data.frame()
   df_nonproj <- if (length(non_projected)) do.call(rbind, non_projected) else data.frame()
 
-  utils::write.table(df_proj,
-                     file.path(output_dir, "ub_bounds_projected.csv"),
-                     sep = ",", row.names = FALSE, col.names = FALSE, quote = FALSE)
-  utils::write.table(df_nonproj,
-                     file.path(output_dir, "ub_bounds_not_projected.csv"),
-                     sep = ",", row.names = FALSE, col.names = FALSE, quote = FALSE)
+  utils::write.table(
+    df_proj,
+    file.path(output_dir, "ub_bounds_projected.csv"),
+    sep = ",", row.names = FALSE, col.names = FALSE, quote = FALSE
+  )
+  utils::write.table(
+    df_nonproj,
+    file.path(output_dir, "ub_bounds_not_projected.csv"),
+    sep = ",", row.names = FALSE, col.names = FALSE, quote = FALSE
+  )
 
   message("✔ Bounds generated:\n - ub_bounds_projected.csv\n - ub_bounds_not_projected.csv")
 }
@@ -125,9 +141,11 @@ run_full_ex_bounds <- function(
     projected_base_lb,
     projected_base_ub,
     not_projected_base_lb,
-    not_projected_base_ub
+    not_projected_base_ub,
+    base_dir = getwd()
 ) {
-  output_dir <- file.path(getwd(), "hypernodes", hypernode_name, "output")
+  # build absolute output directory
+  output_dir <- fs::path(base_dir, "hypernodes", hypernode_name, "output")
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
   # counts keyed by clean FBA-model name
@@ -137,7 +155,7 @@ run_full_ex_bounds <- function(
   )
 
   # Load projection info ------------------------------------------------
-  reaction_bounds_path <- file.path(output_dir, "reaction_bounds.csv")
+  reaction_bounds_path <- fs::path(output_dir, "reaction_bounds.csv")
   if (!file.exists(reaction_bounds_path))
     stop("Missing: ", reaction_bounds_path)
 
@@ -176,7 +194,8 @@ run_full_ex_bounds <- function(
     projected_base_ub       = projected_base_ub,
     not_projected_base_lb   = not_projected_base_lb,
     not_projected_base_ub   = not_projected_base_ub,
-    projected_reactions_df  = projected_reactions_df
+    projected_reactions_df  = projected_reactions_df,
+    base_dir                = base_dir
   )
 }
 

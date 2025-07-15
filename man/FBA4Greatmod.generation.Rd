@@ -12,7 +12,8 @@ FBA4Greatmod.generation(
   lb = NULL,
   obj_fun = NULL,
   react_name = NULL,
-  input_dir
+  input_dir,
+  GUI = FALSE
 )
 }
 \arguments{

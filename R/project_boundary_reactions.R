@@ -24,14 +24,15 @@ project_boundary_reactions <- function(biounit_models,
 
       FBAname = purrr::map_chr(model, ~ clean_name(.x$FBAmodel)),
 
-      model_file = file.path("hypernodes", hypernode_name,
-                             "biounits", FBAname, paste0(FBAname, ".mat")),
-      meta_dir   = file.path("hypernodes", hypernode_name,
-                             "biounits", FBAname)
+      model_file = fs::path(base_dir, "hypernodes", hypernode_name,
+                           "biounits", FBAname, paste0(FBAname, ".mat")),
+      meta_dir   = fs::path(base_dir, "hypernodes", hypernode_name,
+                            "biounits", FBAname)
     )
 
   message("\n🔍 expecting these .mat files:")
   purrr::walk(models_df$model_file, ~ message("   ", .x))
+
 
   models_df <- dplyr::filter(models_df, file.exists(model_file))
   message("✔ models FOUND: ", nrow(models_df))

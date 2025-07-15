@@ -73,7 +73,8 @@ generate_metadata <- function(mat_dir,
     say("▶ [", model_name, "] FBA4Greatmod.generation()")
     model_obj <- FBA4Greatmod.generation(
       fba_mat   = fs::path(model_dir, paste0(model_name, ".mat")),
-      input_dir = model_dir
+      input_dir = model_dir,
+      GUI = TRUE
     )
 
     model_obj <- setBiomassParameters(
