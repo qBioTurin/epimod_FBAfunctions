@@ -2,7 +2,7 @@
 % Please edit documentation in R/generate_metadata.R
 \name{generate_metadata}
 \alias{generate_metadata}
-\title{Generate metadata CSV files for a folder of \*.mat models}
+\title{Generate metadata CSV files for a folder of *.mat models (with debug)}
 \usage{
 generate_metadata(
   mat_dir,
@@ -16,41 +16,21 @@ generate_metadata(
 \arguments{
 \item{mat_dir}{Character.  Folder that contains one or more \verb{*.mat} files.}
 
-\item{output_dir}{Destination root for the generated folders (default =
-\code{mat_dir}).}
+\item{output_dir}{Destination root for the generated folders (default = mat_dir).}
 
-\item{biomass}{Named list with components \code{max}, \code{mean}, \code{min} (defaults
-to 1, 1, 0).  Passed to \code{setBiomassParameters()} so the
-models are self‑contained.}
+\item{biomass}{Named list with components \code{max}, \code{mean}, \code{min} (defaults to 1, 1, 0).
+Passed to \code{setBiomassParameters()}.}
 
 \item{overwrite}{Logical.  Overwrite existing model folders (FALSE).}
 
 \item{quiet}{Logical.  Suppress progress messages (FALSE).}
+
+\item{progress}{Function(idx, total) for progress updates (NULL).}
 }
 \value{
 A tibble (invisibly) with one row per processed model, including the
 path where the metadata files were written.
 }
 \description{
-For every \code{.mat} file found in \code{mat_dir} the function:
-\enumerate{
-\item copies the model into \verb{<output_dir>/<model_name>/},
-\item converts it with \code{FBA4Greatmod.generation()},
-\item writes the text FBA model with \code{writeFBAfile()}.
-}
-
-The latter call creates \code{metabolites_metadata.csv} and
-\code{reactions_metadata.csv} next to the model.  The directory structure is
-identical to a full hyper‑node build so that downstream code can be reused
-unchanged.
-}
-\examples{
-\dontrun{
-generate_metadata("~/models")                 # writes into ~/models/<model>/
-generate_metadata("~/models", output_dir = tempdir())
-}
-
-}
-\seealso{
-\code{\link[=process_model]{process_model()}}, \code{\link[=build_hypernode]{build_hypernode()}}
+Generate metadata CSV files for a folder of *.mat models (with debug)
 }

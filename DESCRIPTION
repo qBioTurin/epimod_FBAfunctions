@@ -41,7 +41,8 @@ Imports:
     readr,
     sensobol,
     magrittr,
-    methods
+    methods,
+    RColorBrewer
 LinkingTo:
 	Rcpp,
 SystemRequirements: 
