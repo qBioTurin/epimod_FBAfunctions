@@ -114,18 +114,39 @@ process_boundary_reactions <- function(
     }
   }
 
-  df_proj    <- if (length(projected))     do.call(rbind, projected)     else data.frame()
-  df_nonproj <- if (length(non_projected)) do.call(rbind, non_projected) else data.frame()
+  # ensure empty data.frames have the correct columns
+  df_proj <- if (length(projected)) {
+    do.call(rbind, projected)
+  } else {
+    data.frame(
+      reaction    = character(),
+      FBAmodel    = character(),
+      upper_bound = double(),
+      stringsAsFactors = FALSE
+    )
+  }
 
+  df_nonproj <- if (length(non_projected)) {
+    do.call(rbind, non_projected)
+  } else {
+    data.frame(
+      reaction    = character(),
+      FBAmodel    = character(),
+      upper_bound = double(),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  # write CSVs with headers
   utils::write.table(
     df_proj,
     file.path(output_dir, "ub_bounds_projected.csv"),
-    sep = ",", row.names = FALSE, col.names = FALSE, quote = FALSE
+    sep = ",", row.names = FALSE, col.names = TRUE, quote = FALSE
   )
   utils::write.table(
     df_nonproj,
     file.path(output_dir, "ub_bounds_not_projected.csv"),
-    sep = ",", row.names = FALSE, col.names = FALSE, quote = FALSE
+    sep = ",", row.names = FALSE, col.names = TRUE, quote = FALSE
   )
 
   message("✔ Bounds generated:\n - ub_bounds_projected.csv\n - ub_bounds_not_projected.csv")

@@ -33,7 +33,6 @@ project_boundary_reactions <- function(biounit_models,
   message("\n🔍 expecting these .mat files:")
   purrr::walk(models_df$model_file, ~ message("   ", .x))
 
-
   models_df <- dplyr::filter(models_df, file.exists(model_file))
   message("✔ models FOUND: ", nrow(models_df))
 
@@ -125,19 +124,23 @@ project_boundary_reactions <- function(biounit_models,
                     sprintf("exclusive_reactions_%s.txt", .y)))
   )
 
+  # Build the bounds table
   bounds_tbl <- shared_rxns_df %>%
     dplyr::select(reaction, organism = abbr,
                   lower_bound = lowbnd, upper_bound = uppbnd) %>%
     dplyr::distinct()
 
+  # always write a (possibly empty) reaction_bounds.csv
   readr::write_csv(bounds_tbl,
                    file.path(out_dir, "reaction_bounds.csv"))
 
-  bounds_tbl %>%
-    dplyr::group_by(organism) %>%
-    dplyr::group_walk(~ readr::write_csv(
-      .x,
-      file.path(out_dir, sprintf("per_bounds_%s.csv", .y$organism))))
+  # and for each organism write per_bounds_<abbr>.csv (header only if empty)
+  all_abbrs <- unique(models_df$abbr)
+  purrr::walk(all_abbrs, function(ab) {
+    out_file <- file.path(out_dir, sprintf("per_bounds_%s.csv", ab))
+    df_sub <- bounds_tbl %>% dplyr::filter(organism == ab)
+    readr::write_csv(df_sub, out_file)
+  })
 
   # =============================
   # Generate irreversible network version
