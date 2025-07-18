@@ -12,10 +12,12 @@ FBAmat.readGUI = function(fba_mat, input_dir){
 
   # if it needs to be generated, do so...
   if (!file.exists(json_path)) {
+  
     py <- system.file("python","test.py", package="epimodFBAfunctions")
     if (py == "") stop("Cannot find mat2json.py in inst/python")
-    status <- system2("python3", args = c(py, fba_mat, json_path),
-                      stdout = TRUE, stderr = TRUE)
+		python_bin <- get_python_bin()
+		status <- system2(python_bin, args = c(py, fba_mat, json_path),
+				              stdout = TRUE, stderr = TRUE)
     if (attr(status,"status") %||% 0 != 0) {
       stop("Error converting MAT→JSON:\n", paste(status, collapse="\n"))
     }
