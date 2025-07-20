@@ -170,8 +170,8 @@ build_hypernodeGUI <- function(hypernode_name,
 
 	if (!is.null(cfg$exchange_bounds)) {
 		# 1) paths to the three bounds files
-		nonproj_f_csv <- fs::path(hyper_root, "output", "background_met_not_projected_f.csv")
-		nonproj_r_csv <- fs::path(hyper_root, "output", "background_met_not_projected_r.csv")
+		nonproj_f_csv <- fs::path(hyper_root, "output", "non_projected_reverse_bounds.csv")
+		nonproj_r_csv <- fs::path(hyper_root, "output", "non_projected_reverse_background_met.csv")
 		proj_csv      <- fs::path(hyper_root, "output", "ub_bounds_projected.csv")
 
 		# 2) define empty templates (correct columns + types)

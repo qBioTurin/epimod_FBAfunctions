@@ -169,10 +169,10 @@ process_boundary_reactions <- function(
 
   # 4) Write non-projected background_met split files
   utils::write.table(df_nonproj_f,
-    file.path(output_dir, "background_met_not_projected_f.csv"),
+    file.path(output_dir, "non_projected_reverse_bounds.csv"),
     sep = ",", row.names = FALSE, col.names = TRUE, quote = FALSE)
   utils::write.table(df_nonproj_r,
-    file.path(output_dir, "background_met_not_projected_r.csv"),
+    file.path(output_dir, "non_projected_reverse_background_met.csv"),
     sep = ",", row.names = FALSE, col.names = TRUE, quote = FALSE)
 
   message("✔ Bounds generated:\n - ub_bounds_projected.csv\n",
