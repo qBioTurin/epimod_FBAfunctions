@@ -2,7 +2,7 @@
 % Please edit documentation in R/model_analysis_GUI.R
 \name{model_analysis_GUI}
 \alias{model_analysis_GUI}
-\title{General Wrapper for epimod::model.analysis (GUI)}
+\title{General Wrapper for epimod::model.analysis (GUI) with console debug}
 \usage{
 model_analysis_GUI(
   paths,
@@ -18,35 +18,6 @@ model_analysis_GUI(
   volume = getwd()
 )
 }
-\arguments{
-\item{paths}{Named character vector of hypernode paths:
-"gen", "config", "src", "output".}
-
-\item{hypernode_name}{Name of the hypernode (used to build filenames).}
-
-\item{debug_solver}{Logical. Pass to \code{debug} argument in analysis.}
-
-\item{i_time}{Numeric. Initial time for simulation.}
-
-\item{f_time}{Numeric. Final time for simulation.}
-
-\item{s_time}{Numeric. Step size for simulation.}
-
-\item{atol}{Numeric. Absolute tolerance.}
-
-\item{rtol}{Numeric. Relative tolerance.}
-
-\item{fba_fname}{Character vector. FBA model \code{.txt} files (from biounits).}
-
-\item{user_files}{Character vector. Additional user data files.}
-
-\item{...}{Additional args passed to \code{epimod::model.analysis}.}
-}
-\value{
-Invisible list of results from \code{epimod::model.analysis}.
-}
 \description{
-Provides a flexible interface to \code{epimod::model.analysis}, constructing
-solver, parameters, function scripts, and auxiliary file paths from a
-hypernode directory structure and user inputs.
+General Wrapper for epimod::model.analysis (GUI) with console debug
 }

@@ -15,7 +15,7 @@ init.gen <- function() {
   
   # assign names & enforce PNPRO order
   names(y_ini) <- yini.names
-  y_ini <- y_ini[yini.names]
+  #y_ini <- y_ini[yini.names]
   
   return(y_ini)
 }

@@ -3,7 +3,7 @@
 # ============================================================
 
 # --------------------------------------------------------------------
-# Utility: strip directory + ".mat", leaving the clean FBA‑model folder
+# Utility: strip directory + ".mat", leaving the clean FBA-model folder
 # --------------------------------------------------------------------
 model_dir <- function(path) {
   tools::file_path_sans_ext(fs::path_file(path))
@@ -91,7 +91,7 @@ process_boundary_reactions <- function(
     projected_reactions_df,
     base_dir = getwd()
 ) {
-  # 1) Load boundary‑reaction metadata -------------------------------
+  # 1) Load boundary-reaction metadata -------------------------------
   metadata_all <- do.call(rbind, lapply(biounit_models, function(model) {
     model_name <- model_dir(model$FBAmodel)
     meta_path  <- fs::path(base_dir, "hypernodes", hypernode_name,
@@ -133,51 +133,78 @@ process_boundary_reactions <- function(
     if (row$projected) {
       ub <- if (rxn_type == "r") abs(projected_base_lb) else projected_base_ub
       projected[[length(projected) + 1]] <-
-        data.frame(reaction     = row$abbreviation,
-                   FBAmodel     = row$FBAmodel,
-                   upper_bound  = ub,
-                   stringsAsFactors = FALSE)
+        data.frame(
+          reaction    = row$abbreviation,
+          FBAmodel    = row$FBAmodel,
+          upper_bound = ub,
+          stringsAsFactors = FALSE
+        )
     } else {
-      # Non-projected: forward uses base ub, reverse uses background_met_base
       if (rxn_type == "r") {
+        # reverse non-projected: background_met and volume
         ub <- abs(background_met_base)
         nonproj_r[[length(nonproj_r) + 1]] <-
-          data.frame(reaction       = row$abbreviation,
-                     FBAmodel       = row$FBAmodel,
-                     background_met = ub,
-                     volume         = volume,
-                     stringsAsFactors = FALSE)
+          data.frame(
+            reaction       = row$abbreviation,
+            FBAmodel       = row$FBAmodel,
+            background_met = ub,
+            volume         = volume,
+            stringsAsFactors = FALSE
+          )
       } else {
+        # forward non-projected: use same header as projected
         ub <- not_projected_base_ub
         nonproj_f[[length(nonproj_f) + 1]] <-
-          data.frame(reaction       = row$abbreviation,
-                     FBAmodel       = row$FBAmodel,
-                     background_met = ub,
-                     stringsAsFactors = FALSE)
+          data.frame(
+            reaction    = row$abbreviation,
+            FBAmodel    = row$FBAmodel,
+            upper_bound = ub,
+            stringsAsFactors = FALSE
+          )
       }
     }
   }
 
   df_proj      <- if (length(projected))     dplyr::bind_rows(projected)     else data.frame(reaction=character(),FBAmodel=character(),upper_bound=double())
-  df_nonproj_f <- if (length(nonproj_f))     dplyr::bind_rows(nonproj_f)    else data.frame(reaction=character(),FBAmodel=character(),background_met=double())
+  df_nonproj_f <- if (length(nonproj_f))     dplyr::bind_rows(nonproj_f)    else data.frame(reaction=character(),FBAmodel=character(),upper_bound=double())
   df_nonproj_r <- if (length(nonproj_r))     dplyr::bind_rows(nonproj_r)    else data.frame(reaction=character(),FBAmodel=character(),background_met=double(),volume=double())
 
-  # 3) Write projected bounds (unchanged)
-  utils::write.table(df_proj,
+  # 3) Write projected bounds
+  utils::write.table(
+    df_proj,
     file.path(output_dir, "ub_bounds_projected.csv"),
-    sep = ",", row.names = FALSE, col.names = TRUE, quote = FALSE)
+    sep = ",",
+    row.names = FALSE,
+    col.names = TRUE,
+    quote = FALSE
+  )
 
-  # 4) Write non-projected background_met split files
-  utils::write.table(df_nonproj_f,
-    file.path(output_dir, "non_projected_reverse_bounds.csv"),
-    sep = ",", row.names = FALSE, col.names = TRUE, quote = FALSE)
-  utils::write.table(df_nonproj_r,
+  # 4) Write forward non-projected with same header as projected
+  utils::write.table(
+    df_nonproj_f,
+    file.path(output_dir, "non_projected_forward_bounds.csv"),
+    sep = ",",
+    row.names = FALSE,
+    col.names = TRUE,
+    quote = FALSE
+  )
+
+  # 5) Write reverse non-projected with background_met & volume
+  utils::write.table(
+    df_nonproj_r,
     file.path(output_dir, "non_projected_reverse_background_met.csv"),
-    sep = ",", row.names = FALSE, col.names = TRUE, quote = FALSE)
+    sep = ",",
+    row.names = FALSE,
+    col.names = TRUE,
+    quote = FALSE
+  )
 
-  message("✔ Bounds generated:\n - ub_bounds_projected.csv\n",
-          " - background_met_not_projected_f.csv\n",
-          " - background_met_not_projected_r.csv")
+  message(
+    "✔ Bounds generated:\n",
+    " - ub_bounds_projected.csv\n",
+    " - non_projected_forward_bounds.csv\n",
+    " - non_projected_reverse_background_met.csv"
+  )
 }
 
 # --------------------------------------------------------------------
@@ -197,13 +224,13 @@ run_full_ex_bounds <- function(
   output_dir <- fs::path(base_dir, "hypernodes", hypernode_name, "output")
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
-  # counts keyed by clean FBA model name -----------------------------
+  # counts keyed by clean FBA model name
   bacteria_counts <- setNames(
     vapply(biounit_models, function(x) x$initial_count, numeric(1)),
     vapply(biounit_models, function(x) model_dir(x$FBAmodel), character(1))
   )
 
-  # Load projection info --------------------------------------------
+  # Load projection info
   reaction_bounds_path <- fs::path(output_dir, "reaction_bounds.csv")
   if (!file.exists(reaction_bounds_path))
     stop("Missing: ", reaction_bounds_path)
@@ -213,12 +240,12 @@ run_full_ex_bounds <- function(
   # Abbreviation ➜ model map
   abbr_map <- setNames(
     vapply(biounit_models, function(x) model_dir(x$FBAmodel), character(1)),
-    vapply(biounit_models, function(x) x$abbreviation[2],     character(1))
+    vapply(biounit_models, function(x) x$abbreviation[2], character(1))
   )
 
-  # Build projection table with the **same** splitting logic --------
+  # Build projection split table
   projected_reactions_df <- purrr::map_dfr(seq_len(nrow(reaction_bounds_df)), function(i) {
-    row <- reaction_bounds_df[i, ]
+    row        <- reaction_bounds_df[i, ]
     full_model <- abbr_map[[row$organism]]
     if (is.null(full_model)) {
       warning("No FBAmodel found for abbreviation: ", row$organism)
@@ -235,14 +262,16 @@ run_full_ex_bounds <- function(
       txt_file     = NA,
       stringsAsFactors = FALSE
     )
-    split_reaction(dummy) |>  # returns only required directions
-      dplyr::transmute(reaction = abbreviation,
-                       type     = ifelse(endsWith(reaction, "_f"), "f", "r"),
-                       FBAmodel = FBAmodel,
-                       bound    = upper_bound)
+    split_reaction(dummy) %>%
+      dplyr::transmute(
+        reaction   = abbreviation,
+        type       = ifelse(endsWith(abbreviation, "_f"), "f", "r"),
+        FBAmodel   = FBAmodel,
+        bound      = upper_bound
+      )
   })
 
-  # Dispatch ---------------------------------------------------------
+  # Dispatch to processing
   process_boundary_reactions(
     hypernode_name         = hypernode_name,
     biounit_models         = biounit_models,
