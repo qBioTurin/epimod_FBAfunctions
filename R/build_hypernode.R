@@ -155,8 +155,8 @@ build_hypernode <- function(hypernode_name,
   repaired_pn <- fs::path(petri_lib, paste0(hypernode_name, ".PNPRO"))
   epimodFBAfunctions::generate_pnpro(readr::read_csv(fs::path(paths$output, "repaired_arcs.csv"), show_col_types = FALSE), repaired_pn)
   # 6) Exchange bounds -------------------------------------------------
-  epimodFBAfunctions::run_full_ex_bounds(hypernode_name, biounit_models, cfg$fba_upper_bound, cfg$fba_lower_bound, cfg$background_met * cfg$volume, 1000)
-  
+  epimodFBAfunctions::run_full_ex_bounds(hypernode_name, biounit_models, cfg$fba_upper_bound, cfg$fba_lower_bound, cfg$background_met, cfg$volume, 1000, base_dir = base_dir)  
+
   if (!is.null(cfg$exchange_bounds)){
     #private_adjust_bounds(cfg, biounit_models, hyper_root, cfg$volume)
 		# 1) paths to the two bounds files
