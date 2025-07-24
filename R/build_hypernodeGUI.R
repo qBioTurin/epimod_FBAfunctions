@@ -177,97 +177,52 @@ build_hypernodeGUI <- function(hypernode_name,
 	)
 
 
-	#────────────────────────────────────────────────────────────────────────────
-	#  DIET-ADJUSTMENT  — aggiorna i bound con i valori di cfg$exchange_bounds
-	#────────────────────────────────────────────────────────────────────────────
-	if (!is.null(cfg$exchange_bounds)) {
+  #──────────────────────────────────────────────────────────────────
+  #  DIET-ADJUSTMENT
+  #──────────────────────────────────────────────────────────────────
+  if (!is.null(cfg$exchange_bounds)) {
 
-		# 1) path ai due nuovi CSV
-		proj_csv   <- fs::path(hyper_root, "output", "ub_bounds_projected.csv")
-		nproj_csv  <- fs::path(hyper_root, "output", "non_projected_bounds.csv")
+    proj_csv  <- fs::path(hyper_root, "output", "ub_bounds_projected.csv")
+    nproj_csv <- fs::path(hyper_root, "output", "non_projected_bounds.csv")
 
-		# 2) template vuoto
-		empty_df <- tibble::tibble(
-		  reaction        = character(),
-		  FBAmodel        = character(),
-		  background_conc = double(),
-		  system_volume   = double()
-		)
+    if (!file.exists(proj_csv) || !file.exists(nproj_csv))
+      stop("Bounds CSV files not found – run_full_ex_bounds must run first.")
 
-		# 3) leggi (o inizializza) i CSV
-		proj_df <- if (fs::file_exists(proj_csv))   readr::read_csv(
-		              proj_csv, show_col_types = FALSE,
-		              col_types = readr::cols(
-		                reaction        = readr::col_character(),
-		                FBAmodel        = readr::col_character(),
-		                background_conc = readr::col_double(),
-		                system_volume   = readr::col_double()
-		              )
-		           ) else empty_df
+    ## DEBUG: stampa dimensioni iniziali
+    message("[DEBUG] Reading bounds: proj = ", proj_csv,
+            " (", file.info(proj_csv)$size, " bytes)  ;  nproj = ",
+            nproj_csv, " (", file.info(nproj_csv)$size, " bytes)")
 
-		nproj_df <- if (fs::file_exists(nproj_csv)) readr::read_csv(
-		              nproj_csv, show_col_types = FALSE,
-		              col_types = readr::cols(
-		                reaction        = readr::col_character(),
-		                FBAmodel        = readr::col_character(),
-		                background_conc = readr::col_double(),
-		                system_volume   = readr::col_double()
-		              )
-		            ) else empty_df
+    proj_df  <- readr::read_csv(proj_csv,  show_col_types = FALSE)
+    nproj_df <- readr::read_csv(nproj_csv, show_col_types = FALSE)
 
-		# 4) Se entrambi vuoti non c’è nulla da fare
-		if (nrow(proj_df) == 0 && nrow(nproj_df) == 0) return(invisible())
+    exch <- cfg$exchange_bounds
+    if (!all(c("reaction", "value") %in% names(exch)))
+      stop("exchange_bounds must contain fields 'reaction' & 'value'.")
 
-		# 5) initial_count per ripartire i consumi tra i modelli
-		init_counts <- vapply(biounit_models, `[[`, numeric(1), "initial_count")
-		names(init_counts) <- vapply(biounit_models, function(x) model_dir(x$FBAmodel), character(1))
+    for (i in seq_len(nrow(exch))) {
 
-		# 6) loop sugli exchange_bounds del JSON
-		exch <- cfg$exchange_bounds
-		if (!all(c("reaction", "value") %in% names(exch)))
-		  stop("exchange_bounds must contain fields 'reaction' and 'value'.")
+      base_rxn <- exch$reaction[i]
+      val      <- as.numeric(exch$value[i])
+      if (is.na(val) || val == 0) next
 
-		for (i in seq_len(nrow(exch))) {
+      target_rxn <- if (val < 0) paste0(base_rxn, "_r") else paste0(base_rxn, "_f")
 
-		  base_rxn <- exch$reaction[i]
-		  val      <- as.numeric(exch$value[i])
+      ## DEBUG: log aggiornamento
+      message("[DEBUG] Setting ", target_rxn,
+              "  background_conc = ", abs(val))
 
-		  # segno del valore → direzione
-		  if (val < 0) {
-		    target_rxn <- paste0(base_rxn, "_r")   # reverse
-		  } else if (val > 0) {
-		    target_rxn <- paste0(base_rxn, "_f")   # forward
-		  } else {
-		    next                                   # 0 => nessuna modifica
-		  }
+      proj_df$background_conc [proj_df$reaction  == target_rxn] <- abs(val)
+      nproj_df$background_conc[nproj_df$reaction == target_rxn] <- abs(val)
+    }
 
-		  ## ---------- PROJECTED -------------------------------------------------
-		  proj_df$background_conc[proj_df$reaction == target_rxn] <- abs(val)
+    readr::write_csv(proj_df,  proj_csv)
+    readr::write_csv(nproj_df, nproj_csv)
 
-		  ## ---------- NON-PROJECTED --------------------------------------------
-		  rows <- which(nproj_df$reaction == target_rxn)
-		  if (length(rows)) {
-		    # modelli che partecipano a questa reazione
-		    orgs <- unique(nproj_df$FBAmodel[rows])
-		    tot  <- sum(init_counts[orgs])
-		    # quota per organismo ∝ initial_count
-		    for (org in orgs) {
-		      share <- abs(val) * (init_counts[org] / tot)
-		      nproj_df$background_conc[rows & nproj_df$FBAmodel == org] <- share
-		    }
-		  }
-		}
+    ## DEBUG: conferma scrittura
+    message("[DEBUG] Diet-adjusted CSV written.")
+  }
 
-		# 7) scrivi i CSV aggiornati
-		readr::write_csv(proj_df,  proj_csv)
-		readr::write_csv(nproj_df, nproj_csv)
-
-		cat(
-		  "✔ Diet-adjusted bounds written to:\n",
-		  "  - ", proj_csv,  "\n",
-		  "  - ", nproj_csv, "\n", sep = ""
-		)
-	}
 
 	# 7) Emit C++ / R helpers -------------------------------------------
 

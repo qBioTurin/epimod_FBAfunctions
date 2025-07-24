@@ -1,14 +1,86 @@
 # ============================================================
-#  File: ex_bounds_module_fixed.R  (unificato in 2 CSV)
+#  File: ex_bounds_module_fixed.R      (2-CSV workflow)
 # ============================================================
 
-# … funzioni ausiliarie model_dir()  e split_reaction() INVARIATE …
-
+# --------------------------------------------------------------------
+# Utility: strip directory + ".mat", leaving the clean FBA-model name
+# --------------------------------------------------------------------
+#' Strip the directory and “.mat” extension from a path.
+#' @keywords internal
+#' @export
+model_dir <- function(path) {
+  tools::file_path_sans_ext(fs::path_file(path))
+}
 
 # --------------------------------------------------------------------
-# Crea **due soli** file:
-#   • ub_bounds_projected.csv
-#   • non_projected_bounds.csv
+# Helper: split one reaction into the directions actually needed
+# --------------------------------------------------------------------
+split_reaction <- function(row) {
+  lb   <- row$lowbnd
+  ub   <- row$uppbnd
+  base <- row$abbreviation
+
+  out <- list()
+
+  ## 1) reversible → both dirs
+  if (lb < 0 && ub > 0) {
+    out$f <- data.frame(
+      reaction     = base,
+      abbreviation = paste0(base, "_f"),
+      name         = paste0(row$name, " (forward)"),
+      equation     = paste("EXPORT:", row$equation),
+      subtype      = row$subtype,
+      FBAmodel     = row$FBAmodel,
+      txt_file     = row$txt_file,
+      upper_bound  = ub,
+      stringsAsFactors = FALSE
+    )
+    out$r <- data.frame(
+      reaction     = base,
+      abbreviation = paste0(base, "_r"),
+      name         = paste0(row$name, " (reverse)"),
+      equation     = paste("IMPORT:", row$equation),
+      subtype      = row$subtype,
+      FBAmodel     = row$FBAmodel,
+      txt_file     = row$txt_file,
+      upper_bound  = abs(lb),
+      stringsAsFactors = FALSE
+    )
+
+  ## 2) irreversible reverse
+  } else if (lb < 0 && ub <= 0) {
+    out$r <- data.frame(
+      reaction     = base,
+      abbreviation = paste0(base, "_r"),
+      name         = paste0(row$name, " (reverse)"),
+      equation     = paste("IMPORT:", row$equation),
+      subtype      = row$subtype,
+      FBAmodel     = row$FBAmodel,
+      txt_file     = row$txt_file,
+      upper_bound  = abs(lb),
+      stringsAsFactors = FALSE
+    )
+
+  ## 3) irreversible forward
+  } else if (lb >= 0 && ub > 0) {
+    out$f <- data.frame(
+      reaction     = base,
+      abbreviation = paste0(base, "_f"),
+      name         = paste0(row$name, " (forward)"),
+      equation     = paste("EXPORT:", row$equation),
+      subtype      = row$subtype,
+      FBAmodel     = row$FBAmodel,
+      txt_file     = row$txt_file,
+      upper_bound  = ub,
+      stringsAsFactors = FALSE
+    )
+  }
+
+  dplyr::bind_rows(out)
+}
+
+# --------------------------------------------------------------------
+# Expand and write bound adjustments for boundary reactions
 # --------------------------------------------------------------------
 process_boundary_reactions <- function(
     hypernode_name,
@@ -18,12 +90,12 @@ process_boundary_reactions <- function(
     projected_upper_bound,
     not_projected_lower_bound,
     not_projected_upper_bound,
-    volume,                                  # unico per tutti
+    volume,                    # unico per tutti
     projected_reactions_df,
     base_dir = getwd()
 ) {
 
-  # --- 1) Metadati delle reazioni di confine ------------------------------
+  ## 1) metadati ----------------------------------------------------------
   metadata_all <- do.call(rbind, lapply(biounit_models, function(model) {
     model_name <- model_dir(model$FBAmodel)
     meta_path  <- fs::path(base_dir, "hypernodes", hypernode_name,
@@ -38,32 +110,29 @@ process_boundary_reactions <- function(
   }))
   metadata_all <- subset(metadata_all, type == "boundary")
 
-  # --- 1b) Espansione in forward/reverse ----------------------------------
+  ## 2) espansione dir ----------------------------------------------------
   expanded <- purrr::map_dfr(seq_len(nrow(metadata_all)),
                              ~ split_reaction(metadata_all[.x, ]))
 
-  # --- 1c) Flag “projected / non-projected” -------------------------------
+  ## 3) flag projected ----------------------------------------------------
   expanded$projected <- mapply(function(rxn, org) {
     any(projected_reactions_df$reaction  == rxn &
         projected_reactions_df$FBAmodel == org)
   }, expanded$abbreviation, expanded$FBAmodel)
 
-  # --- 2) Calcolo dei nuovi bound + build tabelle -------------------------
-  df_proj <- data.frame()        # bounds per metaboliti PROJECTED
-  df_nproj<- data.frame()        # bounds per metaboliti NON-PROJECTED
+  ## 4) build due data-frame  --------------------------------------------
+  df_proj  <- tibble::tibble()
+  df_nproj <- tibble::tibble()
 
   for (i in seq_len(nrow(expanded))) {
-    row <- expanded[i, ]
-    if (grepl("EX_biomass_e", row$abbreviation, fixed = TRUE)) next
-
+    row        <- expanded[i, ]
     is_reverse <- endsWith(row$abbreviation, "_r")
 
-    ## PROJECTED ------------------------------------------------------------
+    ## ---- PROJECTED ------------------------------------------------------
     if (row$projected) {
-
       bound <- if (is_reverse) abs(projected_lower_bound) else projected_upper_bound
 
-      df_proj <- rbind(df_proj, data.frame(
+      df_proj <- dplyr::bind_rows(df_proj, data.frame(
         reaction        = row$abbreviation,
         FBAmodel        = row$FBAmodel,
         background_conc = bound,
@@ -71,12 +140,11 @@ process_boundary_reactions <- function(
         stringsAsFactors = FALSE
       ))
 
-    ## NON-PROJECTED --------------------------------------------------------
+    ## ---- NON-PROJECTED --------------------------------------------------
     } else {
-
       bound <- if (is_reverse) abs(not_projected_lower_bound) else not_projected_upper_bound
 
-      df_nproj <- rbind(df_nproj, data.frame(
+      df_nproj <- dplyr::bind_rows(df_nproj, data.frame(
         reaction        = row$abbreviation,
         FBAmodel        = row$FBAmodel,
         background_conc = bound,
@@ -86,7 +154,7 @@ process_boundary_reactions <- function(
     }
   }
 
-  # --- 3) Scrittura file CSV ----------------------------------------------
+  ## 5) write the two CSV --------------------------------------------------
   utils::write.table(
     df_proj,
     file.path(output_dir, "ub_bounds_projected.csv"),
@@ -100,13 +168,13 @@ process_boundary_reactions <- function(
 
   message(
     "✔ Bounds generated:\n",
-    " - ub_bounds_projected.csv\n",
-    " - non_projected_bounds.csv"
+    "  • ub_bounds_projected.csv\n",
+    "  • non_projected_bounds.csv"
   )
 }
 
 # --------------------------------------------------------------------
-# Master wrapper  (aggiornato con i nuovi argomenti)
+# Master wrapper
 # --------------------------------------------------------------------
 #' @export
 run_full_ex_bounds <- function(
@@ -122,8 +190,45 @@ run_full_ex_bounds <- function(
   output_dir <- fs::path(base_dir, "hypernodes", hypernode_name, "output")
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
-  # … lettura reaction_bounds.csv e costruzione projected_reactions_df  INVARIATA …
+  ## -- reaction_bounds.csv ------------------------------------------------
+  reaction_bounds_path <- fs::path(output_dir, "reaction_bounds.csv")
+  if (!file.exists(reaction_bounds_path))
+    stop("Missing: ", reaction_bounds_path)
 
+  reaction_bounds_df <- read.csv(reaction_bounds_path, stringsAsFactors = FALSE)
+
+  ## -- abbreviazione → nome modello completo ------------------------------
+  abbr_map <- setNames(
+    vapply(biounit_models, function(x) model_dir(x$FBAmodel), character(1)),
+    vapply(biounit_models, function(x) x$abbreviation[2],     character(1))
+  )
+
+  ## -- tabella split per proiezioni ---------------------------------------
+  projected_reactions_df <- purrr::map_dfr(seq_len(nrow(reaction_bounds_df)), function(i) {
+    row        <- reaction_bounds_df[i, ]
+    full_model <- abbr_map[[row$organism]]
+    if (is.null(full_model)) return(NULL)
+
+    dummy <- data.frame(
+      abbreviation = row$reaction,
+      name         = "",
+      equation     = "",
+      subtype      = "",
+      lowbnd       = row$lower_bound,
+      uppbnd       = row$upper_bound,
+      FBAmodel     = full_model,
+      txt_file     = NA,
+      stringsAsFactors = FALSE
+    )
+
+    split_reaction(dummy) %>%
+      dplyr::transmute(
+        reaction = abbreviation,
+        FBAmodel = FBAmodel
+      )
+  })
+
+  ## -- dispatch -----------------------------------------------------------
   process_boundary_reactions(
     hypernode_name             = hypernode_name,
     biounit_models             = biounit_models,
