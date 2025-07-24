@@ -164,155 +164,110 @@ build_hypernodeGUI <- function(hypernode_name,
   repaired_pn <- fs::path(petri_lib, paste0(hypernode_name, ".PNPRO"))
   epimodFBAfunctions::generate_pnpro(readr::read_csv(fs::path(paths$output, "repaired_arcs.csv"), show_col_types = FALSE), repaired_pn)
 
-  # 6) Exchange bounds -------------------------------------------------
-  epimodFBAfunctions::run_full_ex_bounds(hypernode_name, biounit_models, cfg$fba_upper_bound, cfg$fba_lower_bound, cfg$background_met, cfg$volume, 1000, base_dir = base_dir)
+	# 6) Exchange bounds  ----------------------------------------------------------
+	epimodFBAfunctions::run_full_ex_bounds(
+		hypernode_name             = hypernode_name,
+		biounit_models             = biounit_models,
+		projected_lower_bound      = cfg$projected_lower_bound,
+		projected_upper_bound      = cfg$projected_upper_bound,
+		not_projected_lower_bound  = cfg$not_projected_lower_bound,
+		not_projected_upper_bound  = cfg$not_projected_upper_bound,
+		volume                     = cfg$volume,
+		base_dir                   = base_dir
+	)
 
 
-if (!is.null(cfg$exchange_bounds)) {
-  # 1) paths to the three bounds files
-  nonproj_f_csv <- fs::path(hyper_root, "output", "non_projected_forward_bounds.csv")
-  nonproj_r_csv <- fs::path(hyper_root, "output", "non_projected_reverse_background_met.csv")
-  proj_csv      <- fs::path(hyper_root, "output", "ub_bounds_projected.csv")
+	#────────────────────────────────────────────────────────────────────────────
+	#  DIET-ADJUSTMENT  — aggiorna i bound con i valori di cfg$exchange_bounds
+	#────────────────────────────────────────────────────────────────────────────
+	if (!is.null(cfg$exchange_bounds)) {
 
-  # 2) define empty templates (correct columns + types)
-  empty_f_df <- tibble::tibble(
-    reaction    = character(),
-    FBAmodel    = character(),
-    upper_bound = double()
-  )
-  empty_r_df <- tibble::tibble(
-    reaction       = character(),
-    FBAmodel       = character(),
-    background_met = double(),
-    volume         = double()
-  )
-  empty_proj_df <- empty_f_df
+		# 1) path ai due nuovi CSV
+		proj_csv   <- fs::path(hyper_root, "output", "ub_bounds_projected.csv")
+		nproj_csv  <- fs::path(hyper_root, "output", "non_projected_bounds.csv")
 
-  # 3) Read (or initialize) non-projected forward
-  if (fs::file_exists(nonproj_f_csv)) {
-    not_proj_f_df <- readr::read_csv(
-      nonproj_f_csv,
-      show_col_types = FALSE,
-      col_types = readr::cols(
-        reaction    = readr::col_character(),
-        FBAmodel    = readr::col_character(),
-        upper_bound = readr::col_double()
-      )
-    )
-  } else {
-    readr::write_csv(empty_f_df, nonproj_f_csv)
-    not_proj_f_df <- empty_f_df
-  }
+		# 2) template vuoto
+		empty_df <- tibble::tibble(
+		  reaction        = character(),
+		  FBAmodel        = character(),
+		  background_conc = double(),
+		  system_volume   = double()
+		)
 
-  # 4) Read (or initialize) non-projected reverse
-  if (fs::file_exists(nonproj_r_csv)) {
-    not_proj_r_df <- readr::read_csv(
-      nonproj_r_csv,
-      show_col_types = FALSE,
-      col_types = readr::cols(
-        reaction       = readr::col_character(),
-        FBAmodel       = readr::col_character(),
-        background_met = readr::col_double(),
-        volume         = readr::col_double()
-      )
-    )
-  } else {
-    readr::write_csv(empty_r_df, nonproj_r_csv)
-    not_proj_r_df <- empty_r_df
-  }
+		# 3) leggi (o inizializza) i CSV
+		proj_df <- if (fs::file_exists(proj_csv))   readr::read_csv(
+		              proj_csv, show_col_types = FALSE,
+		              col_types = readr::cols(
+		                reaction        = readr::col_character(),
+		                FBAmodel        = readr::col_character(),
+		                background_conc = readr::col_double(),
+		                system_volume   = readr::col_double()
+		              )
+		           ) else empty_df
 
-  # 5) Read (or initialize) projected
-  if (fs::file_exists(proj_csv)) {
-    proj_df <- readr::read_csv(
-      proj_csv,
-      show_col_types = FALSE,
-      col_types = readr::cols(
-        reaction    = readr::col_character(),
-        FBAmodel    = readr::col_character(),
-        upper_bound = readr::col_double()
-      )
-    )
-  } else {
-    readr::write_csv(empty_proj_df, proj_csv)
-    proj_df <- empty_proj_df
-  }
+		nproj_df <- if (fs::file_exists(nproj_csv)) readr::read_csv(
+		              nproj_csv, show_col_types = FALSE,
+		              col_types = readr::cols(
+		                reaction        = readr::col_character(),
+		                FBAmodel        = readr::col_character(),
+		                background_conc = readr::col_double(),
+		                system_volume   = readr::col_double()
+		              )
+		            ) else empty_df
 
-  # 6) Coerce types just in case
-  not_proj_f_df <- not_proj_f_df %>% dplyr::mutate(upper_bound   = as.double(upper_bound))
-  not_proj_r_df <- not_proj_r_df %>% dplyr::mutate(
-    background_met = as.double(background_met),
-    volume         = as.double(volume)
-  )
-  proj_df       <- proj_df       %>% dplyr::mutate(upper_bound   = as.double(upper_bound))
+		# 4) Se entrambi vuoti non c’è nulla da fare
+		if (nrow(proj_df) == 0 && nrow(nproj_df) == 0) return(invisible())
 
-  # 7) If all are still empty, bail out
-  if (nrow(not_proj_f_df) == 0 && nrow(not_proj_r_df) == 0 && nrow(proj_df) == 0) {
-    return(invisible())
-  }
+		# 5) initial_count per ripartire i consumi tra i modelli
+		init_counts <- vapply(biounit_models, `[[`, numeric(1), "initial_count")
+		names(init_counts) <- vapply(biounit_models, function(x) model_dir(x$FBAmodel), character(1))
 
-  # 8) pull initial counts
-  init_counts <- vapply(biounit_models, `[[`, numeric(1), "initial_count")
-  names(init_counts) <- vapply(biounit_models, `[[`, character(1), "FBAmodel")
+		# 6) loop sugli exchange_bounds del JSON
+		exch <- cfg$exchange_bounds
+		if (!all(c("reaction", "value") %in% names(exch)))
+		  stop("exchange_bounds must contain fields 'reaction' and 'value'.")
 
-  # 9) Read exchange_bounds
-  rb <- cfg$exchange_bounds
-  rb$reaction_r     <- paste0(rb$reaction, "_r")
-  rb$background_met <- as.numeric(rb$value)
-  print(head(rb)); flush.console()
+		for (i in seq_len(nrow(exch))) {
 
-  # 10) compute updated per-model bounds for reverse only
-  updated <- purrr::map_dfr(seq_len(nrow(rb)), function(i) {
-    rxn       <- rb$reaction_r[i]
-    subset_df <- dplyr::filter(not_proj_r_df, reaction == rxn)
-    if (nrow(subset_df) == 0) return(NULL)
-    orgs <- unique(subset_df$FBAmodel)
-    tot  <- sum(init_counts[orgs])
-    tibble::tibble(
-      reaction       = rxn,
-      FBAmodel       = orgs,
-      background_met = abs((rb$value[i] * cfg$volume) / tot)
-    )
-  })
+		  base_rxn <- exch$reaction[i]
+		  val      <- as.numeric(exch$value[i])
 
-  # 11) Apply diet adjustments to non-projected reverse
-  not_proj_r_df <- dplyr::left_join(
-    not_proj_r_df,
-    updated %>% dplyr::rename(background_met_diet = background_met),
-    by = c("reaction", "FBAmodel")
-  ) %>%
-    dplyr::mutate(
-      background_met = dplyr::coalesce(background_met_diet, background_met)
-    ) %>%
-    dplyr::select(-background_met_diet)
+		  # segno del valore → direzione
+		  if (val < 0) {
+		    target_rxn <- paste0(base_rxn, "_r")   # reverse
+		  } else if (val > 0) {
+		    target_rxn <- paste0(base_rxn, "_f")   # forward
+		  } else {
+		    next                                   # 0 => nessuna modifica
+		  }
 
-  # 12) Ensure projected bounds are always positive
-  proj_df <- proj_df %>%
-    dplyr::mutate(
-      upper_bound = abs(
-        dplyr::if_else(
-          stringr::str_detect(reaction, "_r$"),
-          rb$background_met[
-            match(stringr::str_remove(reaction, "_r$"), rb$reaction)
-          ],
-          upper_bound
-        )
-      )
-    )
+		  ## ---------- PROJECTED -------------------------------------------------
+		  proj_df$background_conc[proj_df$reaction == target_rxn] <- abs(val)
 
-  # 13) write back
-  readr::write_csv(not_proj_f_df, nonproj_f_csv)
-  readr::write_csv(not_proj_r_df, nonproj_r_csv)
-  readr::write_csv(proj_df,       proj_csv)
+		  ## ---------- NON-PROJECTED --------------------------------------------
+		  rows <- which(nproj_df$reaction == target_rxn)
+		  if (length(rows)) {
+		    # modelli che partecipano a questa reazione
+		    orgs <- unique(nproj_df$FBAmodel[rows])
+		    tot  <- sum(init_counts[orgs])
+		    # quota per organismo ∝ initial_count
+		    for (org in orgs) {
+		      share <- abs(val) * (init_counts[org] / tot)
+		      nproj_df$background_conc[rows & nproj_df$FBAmodel == org] <- share
+		    }
+		  }
+		}
 
-  cat(
-    "✔ Diet-adjusted bounds written to:\n",
-    "  - ", nonproj_f_csv, "\n",
-    "  - ", nonproj_r_csv, "\n",
-    "  - ", proj_csv, "\n",
-    sep = ""
-  ); flush.console()
-}
+		# 7) scrivi i CSV aggiornati
+		readr::write_csv(proj_df,  proj_csv)
+		readr::write_csv(nproj_df, nproj_csv)
 
+		cat(
+		  "✔ Diet-adjusted bounds written to:\n",
+		  "  - ", proj_csv,  "\n",
+		  "  - ", nproj_csv, "\n", sep = ""
+		)
+	}
 
 	# 7) Emit C++ / R helpers -------------------------------------------
 
