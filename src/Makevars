@@ -1,4 +1,6 @@
 CXX_STD = CXX11
+
+# prova pkg-config: funziona sulla maggior parte delle distro
 PKG_CPPFLAGS += $(shell pkg-config --cflags matio)
 PKG_LIBS     += $(shell pkg-config --libs   matio)
-PKG_CPPFLAGS += -I$(R_HOME)/include 
+
