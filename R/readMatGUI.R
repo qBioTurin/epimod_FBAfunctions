@@ -9,17 +9,22 @@ FBAmat.readGUI = function(fba_mat, input_dir){
   
   # define JSON path
   json_path <- sub("\\.mat$", ".json", fba_mat)
+  use_cobra <- FALSE
 
   # if it needs to be generated, do so...
   if (!file.exists(json_path)) {
   
     py <- system.file("python","test.py", package="epimodFBAfunctions")
-    if (py == "") stop("Cannot find mat2json.py in inst/python")
-		python_bin <- get_python_bin()
-		status <- system2(python_bin, args = c(py, fba_mat, json_path),
-				              stdout = TRUE, stderr = TRUE)
-    if (attr(status,"status") %||% 0 != 0) {
-      stop("Error converting MAT→JSON:\n", paste(status, collapse="\n"))
+    if (py == ""){
+    	message("Cannot find mat2json.py in inst/python")
+    }else{
+			python_bin <- get_python_bin()
+			status <- system2(python_bin, args = c(py, fba_mat, json_path),
+						            stdout = TRUE, stderr = TRUE)
+		  if (attr(status,"status") %||% 0 != 0) {
+		    stop("Error converting MAT→JSON:\n", paste(status, collapse="\n"))
+		  }
+		  use_cobra <- TRUE
     }
   }
 
@@ -28,12 +33,25 @@ FBAmat.readGUI = function(fba_mat, input_dir){
     if (file.exists(json_path)) file.remove(json_path)
   }, add = TRUE)
 
-  # ─── benchmark the JSON load ───────────────────────────────
-  timing <- system.time({
-    dat.mat <- read_model_json(json_path)
-    mod.var  <- names(dat.mat)
-  })
-  message(sprintf("⏱ read JSON model: %.3f s", timing["elapsed"]))
+	if(use_cobra){
+		# ─── benchmark the JSON load ───────────────────────────────
+		timing <- system.time({
+		  dat.mat <- read_model_json(json_path)
+		  mod.var  <- names(dat.mat)
+		})
+		message(sprintf("⏱ read JSON model: %.3f s", timing["elapsed"]))
+	}else{
+		timing <- system.time({
+				data    <- R.matlab::readMat(fba_mat)
+				dat.mat <- data[[1]]
+				mod.var <- dimnames(dat.mat)[[1]]
+			})
+
+			message(sprintf(
+				"⏱  readMat + dat.mat extract: %.3f sec elapsed",
+				timing["elapsed"]
+			))	
+	}
 
   
   # 1) model name
