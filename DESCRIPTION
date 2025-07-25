@@ -17,7 +17,6 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Imports:
     Rcpp (>= 1.0.0),
-    RcppArmadillo,
     R.matlab,
     dplyr,
     ggplot2,
@@ -46,12 +45,8 @@ Imports:
     RColorBrewer
 LinkingTo:
 	Rcpp,
-  RcppArmadillo,
 SystemRequirements: 
 	C++11, 
-  HDF5 (>=1.8)
-  zlib,
-  matio
 Suggested:
     devtools,
     pkgload,

@@ -22,9 +22,10 @@ FBAmat.readGUI = function(fba_mat, input_dir){
 			status <- system2(python_bin, args = c(py, fba_mat, json_path),
 						            stdout = TRUE, stderr = TRUE)
 		  if (attr(status,"status") %||% 0 != 0) {
-		    stop("Error converting MAT→JSON:\n", paste(status, collapse="\n"))
+		    message("Error converting MAT→JSON:\n", paste(status, collapse="\n"))
+		  }else{
+		  	use_cobra <- TRUE
 		  }
-		  use_cobra <- TRUE
     }
   }
 
