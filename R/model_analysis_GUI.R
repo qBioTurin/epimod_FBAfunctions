@@ -124,12 +124,27 @@ model_analysis_GUI <- function(
   message("[DEBUG] Original y_ini values: ", paste(val_vec, collapse = ", "))
 
   # 5a) boundary metabolites go in the last positions
-  bm_defs    <- gui_yml$boundary_metabolites %||% character()
-  new_bounds <- as.character(unname(gui_yml$simulation$boundary_concentrations))
-  if (length(bm_defs)) {
-    nvals <- length(val_vec)
-    val_vec[(nvals - length(new_bounds) + 1):nvals] <- new_bounds
-    message("[DEBUG] After boundary patch: ", paste(val_vec, collapse = ", "))
+#  bm_defs    <- gui_yml$boundary_metabolites %||% character()
+#  new_bounds <- as.character(unname(gui_yml$simulation$boundary_concentrations))
+#  if (length(bm_defs)) {
+#    nvals <- length(val_vec)
+#    val_vec[(nvals - length(new_bounds) + 1):nvals] <- new_bounds
+#    message("[DEBUG] After boundary patch: ", paste(val_vec, collapse = ", "))
+#  }
+  # 5a) boundary metabolites – patch by matching names, not by position
+  bc_list <- gui_yml$simulation$boundary_concentrations %||% list()
+  if (length(bc_list)) {
+    for (met in names(bc_list)) {
+      # find exactly the position where this metabolite appears
+      pos <- which(name_vec == met)
+      if (length(pos)) {
+        val_vec[pos] <- as.character(bc_list[[met]])
+        message("[DEBUG] Patching boundary '", met,
+                "' at pos ", pos, " → ", bc_list[[met]])
+      } else {
+        message("[DEBUG] boundary '", met, "' not found in yini.names, skipping")
+      }
+    }
   }
 
   # 5b) patch initial biomass (from each cellular_units$initial_biomass)
@@ -192,6 +207,22 @@ model_analysis_GUI <- function(
   }
 
   ## 7) Call epimod::model.analysis with GUI stubs
+  # ────────────────────────────────────────────────────────────────
+
+  message("[DEBUG-ARGS] paths: ",
+          paste(names(paths), paths, sep="=", collapse=" ; "))
+  message("[DEBUG-ARGS] hypernode_name: ", hypernode_name)
+  message("[DEBUG-ARGS] solver_fname: ", solver_fname)
+  message("[DEBUG-ARGS] parameters_fname: ", parameters_fname)
+  message("[DEBUG-ARGS] functions_fname: ", gui_fun_fname)
+  message("[DEBUG-ARGS] i_time/f_time/s_time: ",
+          i_time, "/", f_time, "/", s_time)
+  message("[DEBUG-ARGS] atol/rtol: ", atol, "/", rtol)
+  message("[DEBUG-ARGS] fba_fname: ", paste(fba_fname, collapse = ", "))
+  message("[DEBUG-ARGS] user_files: ", paste(user_files, collapse = ", "))
+  message("[DEBUG-ARGS] volume: ", volume)
+  message("[DEBUG-ARGS] debug_solver flag: ", debug_solver)
+
   results <- epimod::model.analysis(
     solver_fname     = solver_fname,
     parameters_fname = parameters_fname,
@@ -207,6 +238,7 @@ model_analysis_GUI <- function(
     volume           = volume
   )
   message("[DEBUG] epimod::model.analysis() returned")
+
   invisible(results)
 }
 
