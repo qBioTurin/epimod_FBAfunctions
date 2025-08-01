@@ -2,7 +2,7 @@
 % Please edit documentation in R/model_analysis_GUI.R
 \name{model_analysis_GUI}
 \alias{model_analysis_GUI}
-\title{General Wrapper for epimod::model.analysis (GUI) with console debug}
+\title{General wrapper for epimod::model.analysis (GUI) with console debug}
 \usage{
 model_analysis_GUI(
   paths,
@@ -19,5 +19,5 @@ model_analysis_GUI(
 )
 }
 \description{
-General Wrapper for epimod::model.analysis (GUI) with console debug
+General wrapper for epimod::model.analysis (GUI) with console debug
 }

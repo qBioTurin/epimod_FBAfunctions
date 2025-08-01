@@ -1,4 +1,4 @@
-#' General Wrapper for epimod::model.analysis (GUI) with console debug
+#' General wrapper for epimod::model.analysis (GUI) with console debug
 #'
 #' @export
 model_analysis_GUI <- function(
@@ -16,7 +16,9 @@ model_analysis_GUI <- function(
 ) {
   message("[DEBUG] Starting model_analysis_GUI for hypernode: ", hypernode_name)
 
-  ## 0) Attach & validate
+  # ───────────────────────────────────
+  # 0) Attach & validate
+  # ───────────────────────────────────
   if (!"package:epimod" %in% search()) {
     message("[DEBUG] Loading epimod package")
     library(epimod)
@@ -34,7 +36,9 @@ model_analysis_GUI <- function(
     is.character(user_files)
   )
 
-  ## 1) Build core paths
+  # ───────────────────────────────────
+  # 1) Build core paths
+  # ───────────────────────────────────
   solver_fname     <- fs::path(paths["gen"], paste0(hypernode_name, ".solver"))
   parameters_fname <- fs::path(paths["config"], "initial_data.csv")
   orig_fun_fname   <- fs::path(paths["src"],   paste0("functions_", hypernode_name, ".R"))
@@ -42,7 +46,9 @@ model_analysis_GUI <- function(
   message("[DEBUG] parameters file: ", parameters_fname)
   message("[DEBUG] original functions.R: ", orig_fun_fname)
 
-  ## 2) Ensure files exist
+  # ───────────────────────────────────
+  # 2) Ensure files exist
+  # ───────────────────────────────────
   needed <- c(solver_fname, parameters_fname, orig_fun_fname)
   missing <- needed[!file.exists(needed)]
   if (length(missing)) {
@@ -50,7 +56,9 @@ model_analysis_GUI <- function(
   }
   message("[DEBUG] All core files exist")
 
-  ## 3) Read the GUI snapshot YAML
+  # ───────────────────────────────────
+  # 3) Read GUI snapshot YAML
+  # ───────────────────────────────────
   gui_yaml_path <- fs::path(paths["config"], paste0(hypernode_name, "_gui.yaml"))
   message("[DEBUG] Looking for GUI YAML at: ", gui_yaml_path)
   if (!file.exists(gui_yaml_path)) {
@@ -59,7 +67,9 @@ model_analysis_GUI <- function(
   gui_yml <- yaml::read_yaml(gui_yaml_path)
   message("[DEBUG] Read GUI YAML successfully")
 
-  ## 3a) Write mu_max_values_gui.csv from GUI YAML
+  # ───────────────────────────────────
+  # 3a) mu_max CSV  (high precision)
+  # ───────────────────────────────────
   mu_defs <- gui_yml$cellular_units %||% list()
   if (length(mu_defs) > 0) {
     mu_df <- data.frame(
@@ -69,160 +79,129 @@ model_analysis_GUI <- function(
     )
     mu_csv <- fs::path(paths["config"], "mu_max_values_gui.csv")
     message("[DEBUG] Writing mu_max CSV: ", mu_csv)
-    write.csv(mu_df, mu_csv, row.names = FALSE, quote = FALSE)
+		write.csv(mu_df, mu_csv, row.names = FALSE, quote = FALSE)   # ← tolto digits
+
     user_files <- c(user_files, mu_csv)
   }
 
-  ## 3b) Write population_parameters.csv from GUI YAML (no header, no model names)
-  pop_defs <- gui_yml$cellular_units %||% list()
-  if (length(pop_defs) > 0) {
-    pop_mat <- do.call(rbind, lapply(pop_defs, function(u) {
-      c(u$population$starv, u$population$dup, u$population$death)
-    }))
-    pop_csv <- fs::path(paths["config"], "population_parameters.csv")
-    message("[DEBUG] Writing population parameters CSV: ", pop_csv)
-    write.table(pop_mat, pop_csv,
-                sep = ",", row.names = FALSE,
-                col.names = FALSE, quote = FALSE)
-    # replace any original population_parameters.csv in user_files
-    user_files <- c(setdiff(user_files, fs::path(paths["config"], "population_parameters.csv")), pop_csv)
-  }
+  # ───────────────────────────────────
+  # 3b) population_parameters.csv
+  # ───────────────────────────────────
 
-  ## 4) Fix reverse‐bounds CSV volume if needed
-  rev_csv <- fs::path(paths["output"], "non_projected_reverse_background_met_gui.csv")
-  if (file.exists(rev_csv)) {
-    df_r    <- read.csv(rev_csv, stringsAsFactors = FALSE)
-    gui_vol <- gui_yml$simulation$system_parameters$volume
-    if (!identical(df_r$volume[1], gui_vol)) {
-      df_r$volume <- gui_vol
-      write.csv(df_r, rev_csv, row.names = FALSE, quote = FALSE)
-    }
-  }
+	pop_csv <- fs::path(paths["config"], "population_parameters.csv")
 
-    ## 5) Prepare GUI-patched R stub with full y_ini patching
+	if (!file.exists(pop_csv)) {             # ← aggiungi questo if
+		pop_mat <- do.call(rbind, lapply(pop_defs, function(u)
+		  c(u$population$starv, u$population$dup, u$population$death)))
+
+		message("[DEBUG] Writing population parameters CSV: ", pop_csv)
+		write.table(pop_mat, pop_csv, sep = ",", row.names = FALSE,
+		            col.names = FALSE, quote = FALSE)
+		user_files <- c(user_files, pop_csv)
+	} else {
+		message("[DEBUG] Keeping existing population_parameters.csv")
+	}
+
+
+
+  # ───────────────────────────────────
+  # 5) Prepare GUI-patched R stub
+  # ───────────────────────────────────
   gui_fun_fname <- fs::path(paths["src"], paste0("functions_", hypernode_name, "_gui.R"))
-  message("[DEBUG] Copying functions.R to stub: ", gui_fun_fname)
   file.copy(orig_fun_fname, gui_fun_fname, overwrite = TRUE)
-
   fun_lines <- readLines(gui_fun_fname)
-  message("[DEBUG] Read ", length(fun_lines), " lines from stub")
 
-  # locate y_ini and yini.names
+  # locate y_ini / yini.names
   ini_idx   <- grep("^\\s*y_ini\\s*<-\\s*c\\(", fun_lines)
   names_idx <- grep("^\\s*yini\\.names\\s*<-\\s*c\\(", fun_lines)
-  if (!length(ini_idx) || !length(names_idx)) {
+  if (!length(ini_idx) || !length(names_idx))
     stop("Cannot find y_ini or yini.names definitions in stub")
-  }
 
-  # parse & clean the names vector
   raw_names <- strsplit(sub("^.*c\\((.*)\\).*", "\\1", fun_lines[names_idx]), ",")[[1]]
   name_vec  <- gsub("['\"]", "", trimws(raw_names))
-  message("[DEBUG] Cleaned yini.names: ", paste(name_vec, collapse = ", "))
-
-  # parse the y_ini values
   val_vec   <- trimws(strsplit(sub("^.*c\\((.*)\\).*", "\\1", fun_lines[ini_idx[1]]), ",")[[1]])
-  message("[DEBUG] Original y_ini values: ", paste(val_vec, collapse = ", "))
 
-  # 5a) boundary metabolites go in the last positions
-#  bm_defs    <- gui_yml$boundary_metabolites %||% character()
-#  new_bounds <- as.character(unname(gui_yml$simulation$boundary_concentrations))
-#  if (length(bm_defs)) {
-#    nvals <- length(val_vec)
-#    val_vec[(nvals - length(new_bounds) + 1):nvals] <- new_bounds
-#    message("[DEBUG] After boundary patch: ", paste(val_vec, collapse = ", "))
-#  }
-  # 5a) boundary metabolites – patch by matching names, not by position
+  # ------------------------------------------------------------------
+  #  Fallback: ricostruisco cellular_units se mancante
+  # ------------------------------------------------------------------
+  if (length(gui_yml$cellular_units %||% list()) == 0 &&
+      !is.null(gui_yml$models)) {
+
+    biomass_tags <- grep("^biomass_e_", name_vec, value = TRUE)
+    suff         <- sub("^biomass_e_", "", biomass_tags)
+    if (length(suff) < length(gui_yml$models))
+      suff <- c(suff, sprintf("u%02d", seq_len(length(gui_yml$models))))[seq_len(length(gui_yml$models))]
+
+    gui_yml$cellular_units <- mapply(function(m, lab) {
+      dat <- gui_yml$models[[m]]
+      list(
+        model_name      = m,
+        label           = lab,
+        mu_max          = dat$params$mu_max %||% 1,
+        biomass         = list(
+          max  = dat$params$bioMax,
+          mean = dat$params$bioMean,
+          min  = dat$params$bioMin
+        ),
+        population      = list(
+          starv = dat$params$starv,
+          dup   = dat$params$dup,
+          death = dat$params$death
+        ),
+        initial_biomass = dat$initial_biomass,
+        initial_count   = dat$population
+      )
+    },
+    m   = names(gui_yml$models),
+    lab = suff,
+    SIMPLIFY = FALSE)
+  }
+
+  # ------------------------------------------------------------------
+  # 5a) boundary metabolites
+  # ------------------------------------------------------------------
   bc_list <- gui_yml$simulation$boundary_concentrations %||% list()
-  if (length(bc_list)) {
-    for (met in names(bc_list)) {
-      # find exactly the position where this metabolite appears
-      pos <- which(name_vec == met)
-      if (length(pos)) {
-        val_vec[pos] <- as.character(bc_list[[met]])
-        message("[DEBUG] Patching boundary '", met,
-                "' at pos ", pos, " → ", bc_list[[met]])
-      } else {
-        message("[DEBUG] boundary '", met, "' not found in yini.names, skipping")
-      }
-    }
+  for (met in names(bc_list)) {
+    pos <- which(name_vec == met)
+    if (length(pos)) val_vec[pos] <- as.character(bc_list[[met]])
   }
 
-  # 5b) patch initial biomass (from each cellular_units$initial_biomass)
+  # ------------------------------------------------------------------
+  # 5b) initial biomass
+  # ------------------------------------------------------------------
   for (unit in gui_yml$cellular_units %||% list()) {
-    lbl    <- unit$label
-    target <- paste0("biomass_e_", lbl)
+    if (is.null(unit$label) || unit$label == "")           # label fallback
+      unit$label <- substr(gsub("[^a-z]", "", tolower(unit$model_name)), 1, 4)
+
+    target <- paste0("biomass_e_", unit$label)
     pos    <- which(name_vec == target)
-    if (length(pos)) {
-      cnt        <- as.character(unit$initial_biomass %||% unit$biomass$mean)
-      val_vec[pos] <- cnt
-      message("[DEBUG] Patching ", target, " at position ", pos, " to ", cnt)
-    } else {
-      message("[DEBUG] biomass entry ", target, " not found, skipping")
-    }
+    if (length(pos))
+      val_vec[pos] <- as.character(unit$initial_biomass %||% unit$biomass$mean)
   }
 
-  # 5c) patch initial population (as before)
+  # ------------------------------------------------------------------
+  # 5c) initial population
+  # ------------------------------------------------------------------
   for (unit in gui_yml$cellular_units %||% list()) {
     target <- paste0("n_", unit$label)
     pos    <- which(name_vec == target)
-    if (length(pos)) {
-      cnt        <- as.character(unit$initial_count)
-      val_vec[pos] <- cnt
-      message("[DEBUG] Patching ", target, " at position ", pos, " to ", cnt)
-    } else {
-      message("[DEBUG] n_ entry ", target, " not found, skipping")
-    }
+    if (length(pos))
+      val_vec[pos] <- as.character(unit$initial_count)
   }
 
-  # reconstruct & write the new y_ini line
-  old_y_line <- fun_lines[ini_idx[1]]
-  new_y_line <- sub(
+  # write patched stub
+  fun_lines[ini_idx[1]] <- sub(
     "^\\s*(y_ini\\s*<-\\s*c\\().*(\\).*)$",
     paste0("\\1", paste(val_vec, collapse = ", "), "\\2"),
-    old_y_line
+    fun_lines[ini_idx[1]]
   )
-  fun_lines[ini_idx[1]] <- new_y_line
-  message("[DEBUG] OLD y_ini line: ", old_y_line)
-  message("[DEBUG] NEW y_ini line: ", new_y_line)
-
   writeLines(fun_lines, gui_fun_fname)
-  message("[DEBUG] Wrote patched R stub to: ", gui_fun_fname)
 
 
-  ## 6) Prepare GUI‐patched C++ stub
-  cpp_files <- list.files(paths["src"], "\\.cpp$", full.names = TRUE)
-  if (length(cpp_files)) {
-    orig_cpp <- cpp_files[[1]]
-    gui_cpp  <- fs::path(
-      paths["src"],
-      paste0(tools::file_path_sans_ext(basename(orig_cpp)), "_gui.cpp")
-    )
-    file.copy(orig_cpp, gui_cpp, overwrite = TRUE)
-    cpp_lines <- readLines(gui_cpp)
-    vol_val <- gui_yml$simulation$system_parameters$volume
-    den_val <- gui_yml$simulation$system_parameters$cell_density
-    cpp_lines <- sub("double V = .*?;", sprintf("double V = %g;", vol_val), cpp_lines)
-    cpp_lines <- sub("long long int delta = .*?;", sprintf("long long int delta = %g;", den_val), cpp_lines)
-    writeLines(cpp_lines, gui_cpp)
-  }
-
-  ## 7) Call epimod::model.analysis with GUI stubs
-  # ────────────────────────────────────────────────────────────────
-
-  message("[DEBUG-ARGS] paths: ",
-          paste(names(paths), paths, sep="=", collapse=" ; "))
-  message("[DEBUG-ARGS] hypernode_name: ", hypernode_name)
-  message("[DEBUG-ARGS] solver_fname: ", solver_fname)
-  message("[DEBUG-ARGS] parameters_fname: ", parameters_fname)
-  message("[DEBUG-ARGS] functions_fname: ", gui_fun_fname)
-  message("[DEBUG-ARGS] i_time/f_time/s_time: ",
-          i_time, "/", f_time, "/", s_time)
-  message("[DEBUG-ARGS] atol/rtol: ", atol, "/", rtol)
-  message("[DEBUG-ARGS] fba_fname: ", paste(fba_fname, collapse = ", "))
-  message("[DEBUG-ARGS] user_files: ", paste(user_files, collapse = ", "))
-  message("[DEBUG-ARGS] volume: ", volume)
-  message("[DEBUG-ARGS] debug_solver flag: ", debug_solver)
-
+  # ───────────────────────────────────
+  # 7) Call epimod::model.analysis
+  # ───────────────────────────────────
+  message("[DEBUG] Launching epimod::model.analysis …")
   results <- epimod::model.analysis(
     solver_fname     = solver_fname,
     parameters_fname = parameters_fname,
